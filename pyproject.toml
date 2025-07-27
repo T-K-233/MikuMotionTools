@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools", "wheel", "toml"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mikumotion"
+version = "2025.07.25"
+readme = "README.md"
+authors = [
+    {name = "-T.K.-", email = "tk233.xyz@gmail.com"},
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "mujoco",
+    "mink",
+]
+keywords = ["motion", "mmd", "blender"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+examples = [
+    "loop-rate-limiters >= 0.1.0",
+    "qpsolvers[daqp] >= 4.3.1",
+    "osqp >=0.6.2,<1",
+]
+all = [
+    "mikumotion[examples]",
+]
+
+[project.urls]
+Source = "https://github.com/T-K-233/MikuMotionTools"
+Tracker = "https://github.com/T-K-233/MikuMotionTools/issues"
+
+[tool.setuptools]
+packages = ["mikumotion"]
