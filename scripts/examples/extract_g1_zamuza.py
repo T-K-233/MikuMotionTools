@@ -82,11 +82,9 @@ motion._body_rotations[:, right_hand_idx, :] = quat_mul(motion._body_rotations[:
 # left feet
 motion._body_rotations[:, left_foot_idx, :] = quat_mul(motion._body_rotations[:, left_foot_idx, :], quat_from_euler_xyz(np.deg2rad(90), 0, np.deg2rad(-90)))
 motion._body_rotations[:, left_foot_idx, :] = quat_mul(motion._body_rotations[:, left_foot_idx, :], quat_from_euler_xyz(0, np.deg2rad(65), 0))
-motion._body_positions[:, left_foot_idx, 1] -= 0.15
 # right feet
 motion._body_rotations[:, right_foot_idx, :] = quat_mul(motion._body_rotations[:, right_foot_idx, :], quat_from_euler_xyz(np.deg2rad(90), 0, np.deg2rad(-90)))
 motion._body_rotations[:, right_foot_idx, :] = quat_mul(motion._body_rotations[:, right_foot_idx, :], quat_from_euler_xyz(0, np.deg2rad(65), 0))
-motion._body_positions[:, right_foot_idx, 1] -= 0.15
 
 save_path = "./data/motions/g1_zamuza_0_1632_body_only.npz"
 motion.save(save_path)
