@@ -3,19 +3,33 @@
 MikuMotionTools contains various functions for converting MMD (MikuMikuDance) motions and other motion file formats into armature motion format that can be used in the Isaac Lab RL training environment.
 
 
-## Installation
+## Getting Started
+
+### Create the environment
+
+```bash
+uv sync
+```
+
+To run the examples, do
+
+```bash
+uv pip install -e .
+```
+
+### Install the library
 
 From pip (coming soon)
 
 ```bash
-pip install mikumotion
+uv pip install mikumotion
 ```
 
 From source
 ```bash
 git clone https://github.com/T-K-233/MikuMotionTools.git
 cd ./MikuMotionTools/
-pip install -e .
+uv pip install -e .
 ```
 
 

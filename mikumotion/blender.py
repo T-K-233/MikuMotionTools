@@ -5,6 +5,8 @@ import bpy
 import bpy_types
 from mathutils import Vector
 
+from .motion_sequence import MotionSequence
+
 
 C = bpy.context
 D = bpy.data
@@ -70,6 +72,20 @@ def set_scene_animation_range(start: int, end: int) -> None:
     C.scene.frame_end = end
 
 
+def set_armature_to_rest(armature: bpy_types.Object) -> None:
+    """
+    Set the armature to rest pose.
+    """
+    armature.data.pose_position = "REST"
+
+
+def set_armature_to_pose(armature: bpy_types.Object) -> None:
+    """
+    Set the armature to animation pose.
+    """
+    armature.data.pose_position = "POSE"
+
+
 def set_bones_to_1d_rotation(armature: bpy_types.Object) -> None:
     """
     Set the bones to 1D rotation mode, and allow only Y-axis rotation (along the bone axis).
@@ -95,23 +111,25 @@ def set_bones_to_1d_rotation(armature: bpy_types.Object) -> None:
         bone.lock_ik_z = False
 
 
-def build_motion_data(
+def build_body_motion_data(
     armature: bpy_types.Object,
     mapping: dict[str, tuple[str, Callable]],
     scaling_ratio: float = 1.0,
-) -> dict:
+) -> MotionSequence:
     """
-    Build motion data from the source armature.
+    Build rigid body motion data from the source armature.
+    The dof motion data is not included in this function, which will be initialized 
+    as a properly-dimensioned zero array.
 
     Args:
         armature: The source armature object.
-        mapping: The mapping from bone names to their positions.
+        mapping: The mapping from source armature bone names to target rigid body names.
         scaling_ratio: The scaling ratio of the armature.
 
     Returns:
-        A dictionary containing the motion data.
+        A MotionSequence object containing the motion data.
     """
-    fps_exact = C.scene.render.fps / C.scene.render.fps_base
+    fps_float = C.scene.render.fps / C.scene.render.fps_base
     start_frame = C.scene.frame_start
     end_frame = C.scene.frame_end
 
@@ -120,34 +138,16 @@ def build_motion_data(
     link_names = list(mapping.keys())
 
     n_frames = end_frame - start_frame + 1
-    n_dof = 0  # the number of skeleton DOFs
-    n_body = len(link_names)
 
-    # === create motion data buffers ===
-    # frame rate
-    fps = np.array([fps_exact], dtype=np.int64)  # this needs to be int64
-    # joint names
-    dof_names = np.array([])
-    # body names
-    body_names = np.array(link_names)
-    # joint positions
-    dof_positions = np.zeros((n_frames, n_dof), dtype=np.float32)
-    # joint velocities
-    dof_velocities = np.zeros((n_frames, n_dof), dtype=np.float32)
-    # body world positions
-    body_positions = np.zeros((n_frames, n_body, 3), dtype=np.float32)
-    # body world rotations
-    body_rotations = np.zeros((n_frames, n_body, 4), dtype=np.float32)
-    # body world linear velocities
-    body_linear_velocities = np.zeros((n_frames, n_body, 3), dtype=np.float32)
-    # body world angular velocities
-    body_angular_velocities = np.zeros((n_frames, n_body, 3), dtype=np.float32)
+    motion = MotionSequence(
+        num_frames=n_frames,
+        dof_names=[],
+        body_names=link_names,
+        fps=fps_float,
+    )
 
     # used to calculate angular velocities
-    body_rotations_euler = np.zeros((n_frames, n_body, 3), dtype=np.float32)
-
-    # ensure correct default quaternion representation
-    body_rotations[:, :, 0] = 1.0
+    body_rotations_euler = np.zeros((n_frames, len(link_names), 3), dtype=np.float32)
 
     # === extract motion data ===
     for frame in range(n_frames):
@@ -159,7 +159,7 @@ def build_motion_data(
         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
 
         # read bone positions
-        for idx, name in enumerate(body_names):
+        for idx, name in enumerate(link_names):
             entry = mapping.get(name)
             if not entry:
                 print(f"WARNING: cannot find link mapping for {name}")
@@ -172,74 +172,40 @@ def build_motion_data(
                 print(f"WARNING: cannot find source bone {source_bone_name}")
                 continue
 
-            body_positions[frame, idx, :] = mapping_function(source_bone)
+            motion._body_positions[frame, idx, :] = mapping_function(source_bone)
 
             matrix = source_bone.matrix
-            body_rotations[frame, idx, :] = matrix.to_quaternion()
+            motion._body_rotations[frame, idx, :] = matrix.to_quaternion()
             body_rotations_euler[frame, idx, :] = matrix.to_euler()
 
-        print(f"Processing: #{frame}/{n_frames} ({frame / n_frames * 100:.2f}%)")
+        print(f"Processing: #{frame}/{n_frames} ({frame / n_frames * 100:.2f}%)", end="\r")
 
     # === post-process motion data ===
     # cancel first frame global offset
-    offset_x = np.mean(body_positions[0, :, 0])
-    offset_y = np.mean(body_positions[0, :, 1])
-    body_positions[:, :, 0] -= offset_x
-    body_positions[:, :, 1] -= offset_y
+    offset_x = np.mean(motion._body_positions[0, :, 0])
+    offset_y = np.mean(motion._body_positions[0, :, 1])
+    motion._body_positions[:, :, 0] -= offset_x
+    motion._body_positions[:, :, 1] -= offset_y
 
     # in Blender, scaling the armature does not scale the retreived bone position, so we need to
     # manually apply the scaling to the sampled data here.
-    body_positions[:] *= scaling_ratio
+    motion._body_positions[:] *= scaling_ratio
 
     # calculate velocities
-    body_linear_velocities[1:] = np.diff(body_positions, axis=0) / (1 / fps_exact)
+    motion._body_linear_velocities[1:] = np.diff(motion._body_positions, axis=0) / (1. / fps_float)
 
     # calculate angular velocities
     # handle euler angle discontinuity
     # TODO: this is not quite correct, we need to use quaternions to calculate angular velocities
     body_rotations_euler = np.unwrap(body_rotations_euler, axis=0)
-    body_angular_velocities[1:] = np.diff(body_rotations_euler, axis=0) / (1 / fps_exact)
+    motion._body_angular_velocities[1:] = np.diff(body_rotations_euler, axis=0) / (1. / fps_float)
 
     # handle euler angle wrapping
-    body_angular_velocities = np.unwrap(body_angular_velocities, axis=0)
+    motion._body_angular_velocities = np.unwrap(motion._body_angular_velocities, axis=0)
 
-    print(f"Done generating {n_frames} frames ({n_frames / fps_exact:.2f} seconds)")
+    print(f"Done generating {n_frames} frames ({n_frames / fps_float:.2f} seconds)")
 
-    return {
-        "fps": fps,
-        "dof_names": dof_names,
-        "body_names": body_names,
-        "dof_positions": dof_positions,
-        "dof_velocities": dof_velocities,
-        "body_positions": body_positions,
-        "body_rotations": body_rotations,
-        "body_linear_velocities": body_linear_velocities,
-        "body_angular_velocities": body_angular_velocities
-    }
-
-
-def export_motion_data(output_file: str, motion_data: dict) -> None:
-    """
-    Export motion data to a Numpy npz file.
-
-    Args:
-        output_file: The path to the output file.
-        motion_data: The motion data to export.
-    """
-    np.savez(
-        output_file,
-        fps=motion_data["fps"],
-        dof_names=motion_data["dof_names"],
-        body_names=motion_data["body_names"],
-        dof_positions=motion_data["dof_positions"],
-        dof_velocities=motion_data["dof_velocities"],
-        body_positions=motion_data["body_positions"],
-        body_rotations=motion_data["body_rotations"],
-        body_linear_velocities=motion_data["body_linear_velocities"],
-        body_angular_velocities=motion_data["body_angular_velocities"]
-    )
-
-    print(f"Results saved to {output_file}")
+    return motion
 
 
 def construct_skeleton_tree():

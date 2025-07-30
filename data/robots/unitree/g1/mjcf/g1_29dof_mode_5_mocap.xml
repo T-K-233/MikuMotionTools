@@ -17,60 +17,84 @@
 
   <worldbody>
     <body name="pelvis_target" pos="0.5 0 .5" mocap="true">
-      <geom type="box" size=".04 .04 .04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25" />
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5" />
     </body>
+    <body name="pelvis_current" pos="0.5 0 .5" mocap="true">
+      <geom type="box" size=".03 .03 .03" contype="0" conaffinity="0" rgba=".3 .3 .6 .25" />
+    </body>
+
     <body name="left_rubber_hand_target" pos="0.5 0 .5" mocap="true">
-      <geom type="box" size=".04 .04 .04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25" />
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5" />
+    </body>
+    <body name="left_rubber_hand_current" pos="0.5 0 .5" mocap="true">
+      <geom type="box" size=".03 .03 .03" contype="0" conaffinity="0" rgba=".3 .3 .6 .25" />
     </body>
     <body name="right_rubber_hand_target" pos="0.5 0 .5" mocap="true">
-      <geom type="box" size=".04 .04 .04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25" />
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5" />
+    </body>
+    <body name="right_rubber_hand_current" pos="0.5 0 .5" mocap="true">
+      <geom type="box" size=".03 .03 .03" contype="0" conaffinity="0" rgba=".3 .3 .6 .25" />
     </body>
     <body name="left_ankle_roll_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="box" size=".04 .04 .04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25" />
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5" />
+    </body>
+    <body name="left_ankle_roll_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="box" size=".03 .03 .03" contype="0" conaffinity="0" rgba=".3 .3 .6 .25" />
     </body>
     <body name="right_ankle_roll_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="box" size=".04 .04 .04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25" />
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5" />
+    </body>
+    <body name="right_ankle_roll_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="box" size=".03 .03 .03" contype="0" conaffinity="0" rgba=".3 .3 .6 .25" />
     </body>
 
     <body name="left_shoulder_roll_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
+    </body>
+    <body name="left_shoulder_roll_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
     </body>
     <body name="left_elbow_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
     </body>
-
+    <body name="left_elbow_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
+    </body>
     <body name="right_shoulder_roll_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
+    </body>
+    <body name="right_shoulder_roll_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
     </body>
     <body name="right_elbow_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
     </body>
-
+    <body name="right_elbow_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
+    </body>
     <body name="left_hip_roll_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
+    </body>
+    <body name="left_hip_roll_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
     </body>
     <body name="left_knee_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
     </body>
-
+    <body name="left_knee_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
+    </body>
     <body name="right_hip_roll_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
+    </body>
+    <body name="right_hip_roll_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
     </body>
     <body name="right_knee_link_target" pos="0.5 0 .5" mocap="true">
-      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .6 .3 .25"/>
-      <site type="sphere" size="0.01" rgba="0 0 1 1" group="1" />
+      <geom type="sphere" size=".02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5"/>
+    </body>
+    <body name="right_knee_link_current" pos="0.5 0 .5" mocap="true">
+      <geom type="sphere" size=".04" contype="0" conaffinity="0" rgba=".3 .3 .6 .25"/>
     </body>
   </worldbody>
 </mujoco>

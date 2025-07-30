@@ -1,6 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
-# All rights reserved.
-#
+# Modified from Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # SPDX-License-Identifier: BSD-3-Clause
 
 import matplotlib
@@ -8,7 +6,7 @@ import matplotlib.animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-from mikumotion.motion_loader import MotionLoader
+from mikumotion.motion_sequence import MotionSequence
 
 
 class MatplotViewer:
@@ -18,7 +16,7 @@ class MatplotViewer:
 
     def __init__(
         self,
-        motion_file: str,
+        motion: MotionSequence,
         render_scene: bool = False,
         show_velocity: bool = False,
         show_frames: list[str] = [],
@@ -45,18 +43,14 @@ class MatplotViewer:
         self._frame_length = 0.1  # Length of the coordinate frame axes
 
         # load motions
-        self._motion_loader = MotionLoader(motion_file=motion_file)
+        self._motion = motion
 
-        self._num_frames = self._motion_loader.num_frames
         self._current_frame = 0
-        self._body_positions = self._motion_loader.body_positions
-        self._body_linear_velocities = self._motion_loader.body_linear_velocities
-        self._body_rotations = self._motion_loader.body_rotations
 
         print("\nBody")
-        for i, name in enumerate(self._motion_loader.body_names):
-            minimum = np.min(self._body_positions[:, i], axis=0).round(decimals=2)
-            maximum = np.max(self._body_positions[:, i], axis=0).round(decimals=2)
+        for i, name in enumerate(self._motion.body_names):
+            minimum = np.min(self._motion.body_positions[:, i], axis=0).round(decimals=2)
+            maximum = np.max(self._motion.body_positions[:, i], axis=0).round(decimals=2)
             print(f"  |-- [{name}] minimum position: {minimum}, maximum position: {maximum}")
 
     def _quaternion_to_rotation_matrix(self, q):
@@ -72,9 +66,9 @@ class MatplotViewer:
         """Drawing callback called each frame"""
         # get current motion frame
         # get data
-        vertices = self._body_positions[self._current_frame]
-        velocities = self._body_linear_velocities[self._current_frame]
-        rotations = self._body_rotations[self._current_frame]
+        vertices = self._motion.body_positions[self._current_frame]
+        velocities = self._motion.body_linear_velocities[self._current_frame]
+        rotations = self._motion.body_rotations[self._current_frame]
         # draw skeleton state
         self._figure_axes.clear()
 
@@ -83,7 +77,7 @@ class MatplotViewer:
 
         # Draw coordinate frames for specified bodies
         for name in self._show_frames:
-            idx = self._motion_loader.body_names.index(name)
+            idx = self._motion.body_names.index(name)
             frame_pos = vertices[idx]
             quat = rotations[idx]  # (w, x, y, z)
 
@@ -135,8 +129,8 @@ class MatplotViewer:
         # - scene
         if self._render_scene:
             # compute axes limits
-            minimum = np.min(self._body_positions.reshape(-1, 3), axis=0)
-            maximum = np.max(self._body_positions.reshape(-1, 3), axis=0)
+            minimum = np.min(self._motion.body_positions.reshape(-1, 3), axis=0)
+            maximum = np.max(self._motion.body_positions.reshape(-1, 3), axis=0)
             center = 0.5 * (maximum + minimum)
             diff = 0.75 * (maximum - minimum)
         # - skeleton
@@ -158,10 +152,10 @@ class MatplotViewer:
         self._figure_axes.set_xlabel("X")
         self._figure_axes.set_ylabel("Y")
         self._figure_axes.set_zlabel("Z")
-        self._figure_axes.set_title(f"frame: {self._current_frame}/{self._num_frames}")
+        self._figure_axes.set_title(f"frame: {self._current_frame}/{self._motion.num_frames}")
         # increase frame counter
         self._current_frame += 1
-        if self._current_frame >= self._num_frames:
+        if self._current_frame >= self._motion.num_frames:
             self._current_frame = 0
 
     def show(self) -> None:
@@ -173,7 +167,7 @@ class MatplotViewer:
         self._animation = matplotlib.animation.FuncAnimation(
             fig=self._figure,
             func=self._drawing_callback,
-            frames=self._num_frames,
-            interval=1000 * self._motion_loader.dt,
+            frames=self._motion.num_frames,
+            interval=1000 * self._motion.dt,
         )
         plt.show()

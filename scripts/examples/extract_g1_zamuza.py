@@ -1,5 +1,13 @@
 """
-blender ./blender-projects/G1_Zamuza.blend --python scripts/examples/g1_zamuza.py
+Ubuntu:
+```bash
+blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/extract_g1_zamuza.py
+```
+
+Windows:
+```powershell
+D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\extract_g1_zamuza.py
+```
 """
 
 import sys
@@ -33,43 +41,53 @@ import numpy as np
 from mikumotion.presets import UnitreeG1Mapping
 from mikumotion.blender import (
     set_scene_animation_range,
-    build_motion_data,
-    export_motion_data,
+    build_body_motion_data,
+    # set_armature_to_rest,
+    set_armature_to_pose,
 )
-from mikumotion.math import quat_mul
+from mikumotion.math import quat_mul, quat_from_euler_xyz
 
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
-yyb_scaling = 0.85
+miku_to_g1_scaling = 0.83
 
-section_1 = (0, 1632)
+motion_section = (0, 1632)
 
-set_scene_animation_range(section_1[0], section_1[1])
+set_scene_animation_range(motion_section[0], motion_section[1])
 
 source_armature = D.objects.get("YYB式初音ミクv1.02_arm")
 
-motion_data = build_motion_data(source_armature, mapping=UnitreeG1Mapping.mmd_yyb, scaling_ratio=yyb_scaling)
+# set_armature_to_rest(source_armature)
+set_armature_to_pose(source_armature)
+
+motion = build_body_motion_data(source_armature, mapping=UnitreeG1Mapping.mmd_yyb, scaling_ratio=miku_to_g1_scaling)
 
 
-# realign the frame on hand
-for f in range(motion_data["body_rotations"].shape[0]):
-    # pelvis (root)
-    motion_data["body_rotations"][f, 0, :] = quat_mul(motion_data["body_rotations"][f, 0, :], np.array([0.5, 0.5, 0.5, -0.5]))
-    motion_data["body_rotations"][f, 0, :] = quat_mul(motion_data["body_rotations"][f, 0, :], np.array([0.985, 0, -0.174, 0]))
-    # left hand
-    motion_data["body_rotations"][f, 3, :] = quat_mul(motion_data["body_rotations"][f, 3, :], np.array([0.5, 0.5, 0.5, 0.5]))
-    # right hand
-    motion_data["body_rotations"][f, 6, :] = quat_mul(motion_data["body_rotations"][f, 6, :], np.array([0.5, 0.5, 0.5, 0.5]))
-    # left feet
-    motion_data["body_rotations"][f, 10, :] = quat_mul(motion_data["body_rotations"][f, 10, :], np.array([0.5, 0.5, 0.5, -0.5]))
-    motion_data["body_rotations"][f, 10, :] = quat_mul(motion_data["body_rotations"][f, 10, :], np.array([0.991, 0., -0.131, 0.]))
-    # right feet
-    motion_data["body_rotations"][f, 13, :] = quat_mul(motion_data["body_rotations"][f, 13, :], np.array([0.5, 0.5, 0.5, -0.5]))
-    motion_data["body_rotations"][f, 13, :] = quat_mul(motion_data["body_rotations"][f, 13, :], np.array([0.991, 0., -0.131, 0.]))
+# Post-process the motion data to align the frames
 
-motion_data["body_positions"][:, 10, :] -= 0.1
-motion_data["body_positions"][:, 13, :] -= 0.1
+pelvis_idx = motion.get_body_index(["pelvis"])[0]
+left_hand_idx = motion.get_body_index(["left_rubber_hand"])[0]
+right_hand_idx = motion.get_body_index(["right_rubber_hand"])[0]
+left_foot_idx = motion.get_body_index(["left_ankle_roll_link"])[0]
+right_foot_idx = motion.get_body_index(["right_ankle_roll_link"])[0]
 
+# pelvis (root)
+motion._body_rotations[:, pelvis_idx, :] = quat_mul(motion._body_rotations[:, pelvis_idx, :], quat_from_euler_xyz(np.deg2rad(90), 0, np.deg2rad(-90)))
+motion._body_rotations[:, pelvis_idx, :] = quat_mul(motion._body_rotations[:, pelvis_idx, :], quat_from_euler_xyz(0, np.deg2rad(-16), 0))
+# left hand
+motion._body_rotations[:, left_hand_idx, :] = quat_mul(motion._body_rotations[:, left_hand_idx, :], quat_from_euler_xyz(np.deg2rad(90), np.deg2rad(90), 0))
+# right hand
+motion._body_rotations[:, right_hand_idx, :] = quat_mul(motion._body_rotations[:, right_hand_idx, :], quat_from_euler_xyz(np.deg2rad(90), np.deg2rad(90), 0))
+# left feet
+motion._body_rotations[:, left_foot_idx, :] = quat_mul(motion._body_rotations[:, left_foot_idx, :], quat_from_euler_xyz(np.deg2rad(90), 0, np.deg2rad(-90)))
+motion._body_rotations[:, left_foot_idx, :] = quat_mul(motion._body_rotations[:, left_foot_idx, :], quat_from_euler_xyz(0, np.deg2rad(65), 0))
+motion._body_positions[:, left_foot_idx, 1] -= 0.15
+# right feet
+motion._body_rotations[:, right_foot_idx, :] = quat_mul(motion._body_rotations[:, right_foot_idx, :], quat_from_euler_xyz(np.deg2rad(90), 0, np.deg2rad(-90)))
+motion._body_rotations[:, right_foot_idx, :] = quat_mul(motion._body_rotations[:, right_foot_idx, :], quat_from_euler_xyz(0, np.deg2rad(65), 0))
+motion._body_positions[:, right_foot_idx, 1] -= 0.15
 
-export_motion_data("./data/motions/g1_zamuza_0_960.npz", motion_data)
+save_path = "./data/motions/g1_zamuza_0_960_body_only.npz"
+motion.save(save_path)
+print(f"Results saved to {save_path}")
