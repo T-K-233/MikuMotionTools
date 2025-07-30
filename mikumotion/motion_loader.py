@@ -1,15 +1,18 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
-# All rights reserved.
-#
+# Modified from Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
 # SPDX-License-Identifier: BSD-3-Clause
 
-import numpy as np
 import os
+
+import numpy as np
 
 
 class MotionLoader:
     """
-    Helper class to load and sample motion data from NumPy-file format.
+    Helper class to load motion data from MotionLib format.
+
+    Modified from https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab_tasks/isaaclab_tasks/direct/humanoid_amp/motions/motion_loader.py.
+
+    This class is modified to use numpy instead of torch to load the motion data, suitable for CPU-only environment.
     """
 
     def __init__(self, motion_file: str) -> None:
@@ -17,7 +20,6 @@ class MotionLoader:
 
         Args:
             motion_file: Motion file path to load.
-            device: The device to which to load the data.
 
         Raises:
             AssertionError: If the specified motion file doesn't exist.
@@ -25,70 +27,122 @@ class MotionLoader:
         assert os.path.isfile(motion_file), f"Invalid file path: {motion_file}"
         data = np.load(motion_file)
 
-        self._dof_names = data["dof_names"].tolist()
-        self._body_names = data["body_names"].tolist()
+        self._fps = data["fps"]
+        self._dt = 1.0 / self._fps
+        self._num_frames = self._dof_positions.shape[0]
+        self._duration = self._dt * (self._num_frames - 1)  # duration, sec
 
-        self.dof_positions = data["dof_positions"]
-        self.dof_velocities = data["dof_velocities"]
-        self.body_positions = data["body_positions"]
-        self.body_rotations = data["body_rotations"]
-        self.body_linear_velocities = data["body_linear_velocities"]
-        self.body_angular_velocities = data["body_angular_velocities"]
+        self._dof_names = data["dof_names"].tolist()    # names of the joints
+        self._body_names = data["body_names"].tolist()  # names of the rigid body links
 
-        self.dt = 1.0 / data["fps"]
-        self.num_frames = self.dof_positions.shape[0]
-        self.duration = self.dt * (self.num_frames - 1)
-        print(f"Motion loaded ({motion_file}): duration: {self.duration} sec, frames: {self.num_frames}")
+        self._dof_positions = data["dof_positions"]     # joint positions, rad
+        self._dof_velocities = data["dof_velocities"]   # joint velocities, rad/s
+        self._body_positions = data["body_positions"]   # link positions, m
+        self._body_rotations = data["body_rotations"]   # link rotations, (qw, qx, qy, qz) quaternion
+        self._body_linear_velocities = data["body_linear_velocities"]       # link linear velocities, m/s
+        self._body_angular_velocities = data["body_angular_velocities"]     # link angular velocities, rad/s
+
+        print(f"Motion loaded ({motion_file}): duration: {self._duration} sec, # of frames: {self._num_frames}, FPS: {self._fps}")
+
+    @property
+    def fps(self) -> int:
+        """Frames per second."""
+        return self._fps
+
+    @property
+    def dt(self) -> float:
+        """Time step."""
+        return self._dt
+
+    @property
+    def num_frames(self) -> int:
+        """Number of frames."""
+        return self._num_frames
+
+    @property
+    def duration(self) -> float:
+        """Duration."""
+        return self._duration
 
     @property
     def dof_names(self) -> list[str]:
-        """Skeleton DOF names."""
+        """Joint names."""
         return self._dof_names
 
     @property
     def body_names(self) -> list[str]:
-        """Skeleton rigid body names."""
+        """Rigid body names."""
         return self._body_names
 
     @property
     def num_dofs(self) -> int:
-        """Number of skeleton's DOFs."""
+        """Number of joints."""
         return len(self._dof_names)
 
     @property
     def num_bodies(self) -> int:
-        """Number of skeleton's rigid bodies."""
+        """Number of rigid bodies."""
         return len(self._body_names)
 
+    @property
+    def dof_positions(self) -> np.ndarray:
+        """Joint positions."""
+        return self._dof_positions
+
+    @property
+    def dof_velocities(self) -> np.ndarray:
+        """Joint velocities."""
+        return self._dof_velocities
+
+    @property
+    def body_positions(self) -> np.ndarray:
+        """Rigid body positions."""
+        return self._body_positions
+
+    @property
+    def body_rotations(self) -> np.ndarray:
+        """Rigid body rotations."""
+        return self._body_rotations
+
+    @property
+    def body_linear_velocities(self) -> np.ndarray:
+        """Rigid body linear velocities."""
+        return self._body_linear_velocities
+
+    @property
+    def body_angular_velocities(self) -> np.ndarray:
+        """Rigid body angular velocities."""
+        return self._body_angular_velocities
+
     def get_dof_index(self, dof_names: list[str]) -> list[int]:
-        """Get skeleton DOFs indexes by DOFs names.
+        """Get joint indexes by joint names.
 
         Args:
-            dof_names: List of DOFs names.
+            dof_names: List of joint names.
 
         Raises:
-            AssertionError: If the specified DOFs name doesn't exist.
+            AssertionError: If the specified joint name doesn't exist.
 
         Returns:
-            List of DOFs indexes.
+            List of joint indexes.
         """
         indexes = []
         for name in dof_names:
-            assert name in self._dof_names, f"The specified DOF name ({name}) doesn't exist: {self._dof_names}"
+            assert name in self._dof_names, f"The specified joint name ({name}) doesn't exist: {self._dof_names}"
             indexes.append(self._dof_names.index(name))
         return indexes
 
     def get_body_index(self, body_names: list[str]) -> list[int]:
-        """Get skeleton body indexes by body names.
+        """Get rigid body indexes by rigid body names.
 
         Args:
-            dof_names: List of body names.
+            body_names: List of rigid body names.
 
         Raises:
-            AssertionError: If the specified body name doesn't exist.
+            AssertionError: If the specified rigid body name doesn't exist.
 
         Returns:
-            List of body indexes.
+            List of rigid body indexes.
         """
         indexes = []
         for name in body_names:
@@ -100,29 +154,27 @@ class MotionLoader:
         self,
         frames: int | list[int] | np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Sample motion data.
+        """Get motion data by frame indices.
+        This function will automatically clip the frame indices to the valid range. If the frame indices are out of range,
+        the function will return the data of last frame (as upper bound) or first frame (as lower bound).
 
         Args:
             frames: List of frame indices to sample.
 
         Returns:
-            Sampled motion DOF positions (with shape (N, num_dofs)), DOF velocities (with shape (N, num_dofs)),
-            body positions (with shape (N, num_bodies, 3)), body rotations (with shape (N, num_bodies, 4), as wxyz quaternion),
-            body linear velocities (with shape (N, num_bodies, 3)) and body angular velocities (with shape (N, num_bodies, 3)).
+            Motion joint positions (with shape (N, num_dofs)), joint velocities (with shape (N, num_dofs)),
+            rigid body positions (with shape (N, num_bodies, 3)), rigid body rotations (with shape (N, num_bodies, 4), as wxyz quaternion),
+            rigid body linear velocities (with shape (N, num_bodies, 3)) and rigid body angular velocities (with shape (N, num_bodies, 3)).
         """
-        if isinstance(frames, int):
-            assert 0 <= frames < self.num_frames, f"Invalid frame index: {frames}"
-        else:
-            frames = np.array(frames)
-            assert np.all(0 <= frames) and np.all(frames < self.num_frames), f"Invalid frame indices: {frames}"
+        frames = np.clip(frames, 0, self._num_frames - 1)
 
         return (
-            self.dof_positions[frames],
-            self.dof_velocities[frames],
-            self.body_positions[frames],
-            self.body_rotations[frames],
-            self.body_linear_velocities[frames],
-            self.body_angular_velocities[frames],
+            self._dof_positions[frames],
+            self._dof_velocities[frames],
+            self._body_positions[frames],
+            self._body_rotations[frames],
+            self._body_linear_velocities[frames],
+            self._body_angular_velocities[frames],
         )
 
 
