@@ -10,7 +10,7 @@ from mikumotion.motion_sequence import MotionSequence
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--motion_file", type=str, default="./data/motions/g1_zamuza_0_960_body_only.npz")
+parser.add_argument("--file", type=str)
 parser.add_argument("--realtime", action="store_true", help="Visualize in realtime")
 args = parser.parse_args()
 
@@ -28,7 +28,7 @@ def main():
         "left_knee_link", "right_knee_link",
     ]
 
-    motion = MotionSequence.load(args.motion_file)
+    motion = MotionSequence.load(args.file)
 
     pose_indices = motion.get_body_index(pose_names)
     pole_indices = motion.get_body_index(pole_names)
@@ -133,7 +133,7 @@ def main():
 
     viewer.close()
 
-    motion_file_out = args.motion_file.replace(".npz", "_retargeted.npz")
+    motion_file_out = args.file.replace(".npz", "_retargeted.npz")
     motion.save(motion_file_out)
     print(f"Results saved to {motion_file_out}")
 

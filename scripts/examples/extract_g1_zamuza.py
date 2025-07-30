@@ -88,6 +88,6 @@ motion._body_rotations[:, right_foot_idx, :] = quat_mul(motion._body_rotations[:
 motion._body_rotations[:, right_foot_idx, :] = quat_mul(motion._body_rotations[:, right_foot_idx, :], quat_from_euler_xyz(0, np.deg2rad(65), 0))
 motion._body_positions[:, right_foot_idx, 1] -= 0.15
 
-save_path = "./data/motions/g1_zamuza_0_960_body_only.npz"
+save_path = "./data/motions/g1_zamuza_0_1632_body_only.npz"
 motion.save(save_path)
 print(f"Results saved to {save_path}")
