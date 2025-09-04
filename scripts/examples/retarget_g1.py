@@ -76,6 +76,7 @@ def main():
     motion._dof_names = [model.joint(1 + i).name for i in range(model.nu)]
     # override the dof positions with correct dimension
     motion._dof_positions = np.zeros((motion.num_frames, model.nu), dtype=np.float32)
+    motion._dof_velocities = np.zeros((motion.num_frames, model.nu), dtype=np.float32)
 
     viewer = mujoco.viewer.launch_passive(
         model=model, data=data  #, show_left_ui=False, show_right_ui=False
@@ -130,6 +131,8 @@ def main():
         viewer.sync()
         if args.realtime:
             rate.sleep()
+
+    motion._dof_velocities[1:] = np.diff(motion._dof_positions, axis=0) / (1. / motion.fps[0])
 
     viewer.close()
 
