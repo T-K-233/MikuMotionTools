@@ -50,7 +50,7 @@ from mikumotion.math import quat_mul, quat_from_euler_xyz
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
-miku_to_g1_scaling = 0.85
+miku_to_g1_scaling = 0.83
 
 motion_section = (0, 1632)
 
