@@ -14,7 +14,7 @@ uv sync
 To run the examples, do
 
 ```bash
-uv pip install -e .
+uv sync --extra examples
 ```
 
 ### Install the library
@@ -43,7 +43,7 @@ uv pip install -e .
 
 `data/robots/` stores the robot asset file used during inverse kinematic solving.
 
-Note: Due to licensing issue, the Blender project files and MMD motions should be retrieved from the original authors. For internal developers, the mirror of this directory is stored at [Google Drive]().
+Note: Due to licensing issue, the Blender project files and MMD motions should be retrieved from the original authors. For internal developers, the mirror of this directory is stored at [Google Drive](https://drive.google.com/drive/folders/1sFQmo_UvkY5xSIZKLjXLxlAOpLdI_1jz?usp=drive_link).
 
 
 ## Motion Format
@@ -65,6 +65,37 @@ Each motion file is a numpy dictionary with the following fields. Here, we assum
 The converted motion file is targeted for one particular robot skeleton structure. 
 
 To ensure best performance, also make sure that the frame rate matches the training environment policy update rate to avoid expensive interpolations.
+
+### Generic Joint Names
+
+We follow the [SMPL-X joint name](https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18) as a generic joint naming convention.
+
+```
+    "pelvis",
+    "left_hip",
+    "right_hip",
+    "spine1",
+    "left_knee",
+    "right_knee",
+    "spine2",
+    "left_ankle",
+    "right_ankle",
+    "spine3",
+    "left_foot",
+    "right_foot",
+    "neck",
+    "left_collar",
+    "right_collar",
+    "head",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hand",
+    "right_hand",
+```
 
 
 ## Working with MMD

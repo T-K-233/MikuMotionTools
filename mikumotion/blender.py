@@ -2,10 +2,11 @@ from typing import Callable
 
 import numpy as np
 import bpy
-import bpy_types
-from mathutils import Vector
+from bpy_types import Object, PoseBone
+from mathutils import Vector, Quaternion
 
 from .motion_sequence import MotionSequence
+from .math import quat_mul
 
 
 C = bpy.context
@@ -72,21 +73,21 @@ def set_scene_animation_range(start: int, end: int) -> None:
     C.scene.frame_end = end
 
 
-def set_armature_to_rest(armature: bpy_types.Object) -> None:
+def set_armature_to_rest(armature: Object) -> None:
     """
     Set the armature to rest pose.
     """
     armature.data.pose_position = "REST"
 
 
-def set_armature_to_pose(armature: bpy_types.Object) -> None:
+def set_armature_to_pose(armature: Object) -> None:
     """
     Set the armature to animation pose.
     """
     armature.data.pose_position = "POSE"
 
 
-def set_bones_to_1d_rotation(armature: bpy_types.Object) -> None:
+def set_bones_to_1d_rotation(armature: Object) -> None:
     """
     Set the bones to 1D rotation mode, and allow only Y-axis rotation (along the bone axis).
     Use this function to convert arbitrary armature to "realistic" robot armature with revolute joints.
@@ -112,7 +113,7 @@ def set_bones_to_1d_rotation(armature: bpy_types.Object) -> None:
 
 
 def build_body_motion_data(
-    armature: bpy_types.Object,
+    armature: Object,
     mapping: dict[str, tuple[str, Callable]],
     scaling_ratio: float = 1.0,
 ) -> MotionSequence:
@@ -165,18 +166,34 @@ def build_body_motion_data(
                 print(f"WARNING: cannot find link mapping for {name}")
                 continue
 
-            source_bone_name, mapping_function = entry
+            source_bone_name: str = entry.get("bone")
+            if not source_bone_name:
+                print(f"WARNING: cannot find source bone name for {name}")
+                continue
 
-            source_bone = armature.pose.bones.get(source_bone_name)
+            source_bone: PoseBone = armature.pose.bones.get(source_bone_name)
             if not source_bone:
                 print(f"WARNING: cannot find source bone {source_bone_name}")
                 continue
 
-            motion._body_positions[frame, idx, :] = mapping_function(source_bone)
+            mapping_function: Callable = entry.get("func")
+            if mapping_function:
+                bone_position: Vector = mapping_function(source_bone)
+            else:
+                # default to get the head of the bone
+                bone_position: Vector = source_bone.head
+            # get the position offset in (x, y, z) in meters
+            if entry.get("pos"):
+                bone_position += entry.get("pos")
+            motion._body_positions[frame, idx, :] = bone_position
 
-            matrix = source_bone.matrix
-            motion._body_rotations[frame, idx, :] = matrix.to_quaternion()
-            body_rotations_euler[frame, idx, :] = matrix.to_euler()
+            # get the rotation offset in (w, x, y, z) quaternion
+            bone_rotation: Quaternion = source_bone.matrix.to_quaternion()
+            if entry.get("quat"):
+                bone_rotation = Quaternion(quat_mul(bone_rotation, entry.get("quat")))
+            motion._body_rotations[frame, idx, :] = bone_rotation
+
+            body_rotations_euler[frame, idx, :] = bone_rotation.to_euler()
 
         print(f"Processing: #{frame}/{n_frames} ({frame / n_frames * 100:.2f}%)", end="\r")
 
@@ -552,7 +569,7 @@ def bind_to_armature(skeleton_tree: dict):
         frame.matrix_world = matrix_world.copy()
 
 
-def load_replay(skeleton_tree: dict, armature: bpy_types.Object, data_path: str):
+def load_replay(skeleton_tree: dict, armature: Object, data_path: str):
     # TODO: refactor the replay motion format to use the same format as the motion data
     data = np.load(data_path)
 

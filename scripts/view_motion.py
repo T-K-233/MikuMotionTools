@@ -28,7 +28,7 @@ matplotlib.use(args.matplotlib_backend)
 
 motion = MotionSequence.load(args.file)
 
-g1_frames = ["pelvis", "left_rubber_hand", "right_rubber_hand", "left_ankle_roll_link", "right_ankle_roll_link"]
+generic_frames = ["pelvis", "left_hand", "right_hand", "left_ankle", "right_ankle", "left_foot", "right_foot", "head"]
 
-viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=g1_frames)
+viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=generic_frames)
 viewer.show()
