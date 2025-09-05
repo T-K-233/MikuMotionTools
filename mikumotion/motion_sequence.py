@@ -50,7 +50,7 @@ class MotionSequence:
 
     def __init__(self, num_frames: int, dof_names: list[str], body_names: list[str], fps: int = 50) -> None:
         """Initialize a MotionSequence object.
-        
+
         Args:
             num_frames: Number of frames.
             dof_names: List of joint names.
@@ -215,7 +215,7 @@ class MotionSequence:
 
     def save(self, path: str) -> None:
         """Save the motion data to a file.
-        
+
         Args:
             path: The path to the output file.
         """

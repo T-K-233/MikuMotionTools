@@ -62,10 +62,10 @@ class GenericKeypointMapping:
         "right_shoulder":   {"bone": "腕.R",        },  # 17
         "left_elbow":       {"bone": "ひじ.L",      },  # 18
         "right_elbow":      {"bone": "ひじ.R",      },  # 19
-        "left_wrist":       {"bone": "手首.L", "quat": [0.5, 0.5, 0.5, 0.5]},  # 20
-        "right_wrist":      {"bone": "手首.R", "quat": [0.5, 0.5, 0.5, 0.5]},  # 21
-        "left_hand":        {"bone": "手首.L", "func": lambda b: b.tail, "quat": [0.5, 0.5, 0.5, 0.5]},  # 22
-        "right_hand":       {"bone": "手首.R", "func": lambda b: b.tail, "quat": [0.5, 0.5, 0.5, 0.5]},  # 23
+        "left_wrist":       {"bone": "手首.L", "quat": [0.707, 0.707, 0.0, 0.0]},  # 20
+        "right_wrist":      {"bone": "手首.R", "quat": [0.707, 0.707, 0.0, 0.0]},  # 21
+        "left_hand":        {"bone": "手首.L", "func": lambda b: b.tail, "quat": [0.707, 0.707, 0.0, 0.0]},  # 22
+        "right_hand":       {"bone": "手首.R", "func": lambda b: b.tail, "quat": [0.707, 0.707, 0.0, 0.0]},  # 23
     }
     # mixamo = {
     #     "pelvis"            : ("mixamorig:Hips",            lambda b: b.head),

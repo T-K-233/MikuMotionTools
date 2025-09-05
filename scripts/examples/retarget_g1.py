@@ -35,7 +35,7 @@ if __name__ == "__main__":
                     },
                     "offset": {
                         "position": [0.0, 0.0, 0.0],
-                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                        "orientation": [0.707, 0.0, 0.707, 0.0],
                     }
                 },
                 "right_rubber_hand": {
@@ -46,7 +46,7 @@ if __name__ == "__main__":
                     },
                     "offset": {
                         "position": [0.0, 0.0, 0.0],
-                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                        "orientation": [0.707, 0.0, 0.707, 0.0],
                     }
                 },
                 "left_ankle_roll_link": {

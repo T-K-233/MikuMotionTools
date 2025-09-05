@@ -119,7 +119,7 @@ def build_body_motion_data(
 ) -> MotionSequence:
     """
     Build rigid body motion data from the source armature.
-    The dof motion data is not included in this function, which will be initialized 
+    The dof motion data is not included in this function, which will be initialized
     as a properly-dimensioned zero array.
 
     Args:
