@@ -160,6 +160,155 @@ if __name__ == "__main__":
                     }
                 },
             }
+        case "hxg_humanoid":
+            robot_xml = "/home/tk/Downloads/Hxg-Humanoid/data/robots/hxg/hxg_humanoid/mjcf/scene.xml"
+            mapping_table = {
+                "pelvis_link": {
+                    "body": "pelvis",
+                    "weight": {
+                        "position": 10.0,
+                        "orientation": 1.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.1],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "left_elbow_yaw_lihnk": {
+                    "body": "left_hand",
+                    "weight": {
+                        "position": 10.0,
+                        "orientation": 1.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        # "orientation": [0.5, 0.5, -0.5, -0.5],
+                        "orientation": [0.271, 0.271, -0.653, -0.653],
+                    }
+                },
+                "right_elbow_yaw_link": {
+                    "body": "right_hand",
+                    "weight": {
+                        "position": 10.0,
+                        "orientation": 1.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        # "orientation": [0.5, -0.5, 0.5, -0.5],
+                        "orientation": [0.271, -0.271, 0.653, -0.653],
+                    }
+                },
+                "left_foot_link": {
+                    "body": "left_foot",
+                    "weight": {
+                        "position": 10.0,
+                        "orientation": 2.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [0.707, 0.0, -0.707, 0.0],
+                    }
+                },
+                "right_foot_link": {
+                    "body": "right_foot",
+                    "weight": {
+                        "position": 10.0,
+                        "orientation": 2.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [0.707, 0.0, -0.707, 0.0],
+                    }
+                },
+                "left_shoulder_pitch_link": {
+                    "body": "left_shoulder",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.08],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "left_elbow_pitch_link": {
+                    "body": "left_elbow",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "right_shoulder_pitch_link": {
+                    "body": "right_shoulder",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.08],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "right_elbow_pitch_link": {
+                    "body": "right_elbow",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "left_thigh_link": {
+                    "body": "left_hip",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "right_thigh_link": {
+                    "body": "right_hip",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "left_shin_link": {
+                    "body": "left_knee",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.08],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+                "right_shin_link": {
+                    "body": "right_knee",
+                    "weight": {
+                        "position": 1.0,
+                        "orientation": 0.0,
+                    },
+                    "offset": {
+                        "position": [0.0, 0.0, 0.08],
+                        "orientation": [1.0, 0.0, 0.0, 0.0],
+                    }
+                },
+            }
         case _:
             raise ValueError(f"Unsupported robot: {args.robot}")
 

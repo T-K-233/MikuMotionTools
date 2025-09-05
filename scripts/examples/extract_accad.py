@@ -59,7 +59,7 @@ source_armature = D.objects.get("Female1_B03_Walk1")
 # set_armature_to_rest(source_armature)
 set_armature_to_pose(source_armature)
 
-scaling_ratio = 0.9
+scaling_ratio = 1.0
 
 motion = build_body_motion_data(source_armature, mapping=GenericKeypointMapping.accad, scaling_ratio=scaling_ratio)
 
