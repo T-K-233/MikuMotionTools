@@ -163,6 +163,6 @@ if __name__ == "__main__":
         case _:
             raise ValueError(f"Unsupported robot: {args.robot}")
 
-    retargeting = MotionRetargeting(motion_file, robot_xml, mapping_table, realtime=args.realtime)
+    retargeting = MotionRetargeting(motion_file, robot_xml, mapping_table)
 
-    retargeting.run()
+    retargeting.run(realtime=args.realtime)
