@@ -15,6 +15,32 @@ class GenericKeypointMapping:
     The position and rotation offsets are the relative offsets between the source bone
     and the target bone in global coordinate frame.
     """
+    accad = {
+        "pelvis":           {"bone": "Hips", "quat": [0.609, 0.359, 0.359, -0.609]},  # 0
+        "left_hip":         {"bone": "LeftUpLeg",        },  # 1
+        "right_hip":        {"bone": "RightUpLeg",        },  # 2
+        "spine1":           {"bone": "ToSpine", "func": lambda b: b.tail },  # 3
+        "left_knee":        {"bone": "LeftLeg",      },  # 4
+        "right_knee":       {"bone": "RightLeg",      },  # 5
+        "spine2":           {"bone": "Spine",     },  # 6
+        "left_ankle":       {"bone": "LeftFoot", "quat": [0.123, 0.696, 0.696, -0.123]},  # 7
+        "right_ankle":      {"bone": "RightFoot", "quat": [0.123, 0.696, 0.696, -0.123]},  # 8
+        "spine3":           {"bone": "Spine1",     },  # 9
+        "left_foot":        {"bone": "LeftToeBase", "quat": [0.062, -0.704, -0.704, -0.062]},  # 10
+        "right_foot":       {"bone": "RightToeBase", "quat": [0.062, -0.704, -0.704, -0.062]},  # 11
+        "neck":             {"bone": "Neck",          },  # 12
+        "left_collar":      {"bone": "LeftShoulder",        },  # 13
+        "right_collar":     {"bone": "RightShoulder",        },  # 14
+        "head":             {"bone": "Head", "quat": [0.455, -0.542, -0.542, -0.455]},  # 15
+        "left_shoulder":    {"bone": "LeftArm",        },  # 16
+        "right_shoulder":   {"bone": "RightArm",        },  # 17
+        "left_elbow":       {"bone": "LeftForeArm",      },  # 18
+        "right_elbow":      {"bone": "RightForeArm",      },  # 19
+        "left_wrist":       {"bone": "LeftHand", "quat": [0.5, 0.5, -0.5, 0.5]},  # 20
+        "right_wrist":      {"bone": "RightHand", "quat": [0.5, 0.5, -0.5, 0.5]},  # 21
+        "left_hand":        {"bone": "LeftHand", "func": lambda b: b.tail, "quat": [0.5, 0.5, -0.5, 0.5]},  # 22
+        "right_hand":       {"bone": "RightHand", "func": lambda b: b.tail, "quat": [0.5, 0.5, -0.5, 0.5]},  # 23
+    }
     # actorcore = {
     #     "pelvis"            : "CC_Base_Pelvis",        lambda b: b.head),  # 0
     #     "left_hip"          : ("CC_Base_L_Thigh",       lambda b: b.head),  # 1
