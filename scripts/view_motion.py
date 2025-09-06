@@ -11,6 +11,7 @@ from mikumotion.viewers import MatplotViewer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--motion", type=str, required=True, help="Motion file")
+parser.add_argument("--robot", type=str, default="smplx", help="Robot name to select which frame to show")
 parser.add_argument(
     "--render-scene",
     action="store_true",
@@ -28,7 +29,13 @@ matplotlib.use(args.matplotlib_backend)
 
 motion = MotionSequence.load(args.motion)
 
-generic_frames = ["pelvis", "left_hand", "right_hand", "left_ankle", "right_ankle", "left_foot", "right_foot", "head"]
+match args.robot:
+    case "smplx":
+        frames = ["pelvis", "left_hand", "right_hand", "left_ankle", "right_ankle", "left_foot", "right_foot", "head"]
+    case "unitree_g1":
+        frames = ["pelvis", "left_rubber_hand", "right_rubber_hand", "left_ankle_roll_link", "right_ankle_roll_link"]
+    case _:
+        frames = []
 
-viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=generic_frames)
+viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=frames)
 viewer.show()

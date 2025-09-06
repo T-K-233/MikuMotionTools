@@ -5,7 +5,7 @@ from mikumotion.motion_retargeting import MotionRetargeting
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--motion", type=str, help="Source motion file")
-parser.add_argument("--robot", type=str, help="Robot XML file")
+parser.add_argument("--robot", type=str, help="Robot name")
 parser.add_argument("--realtime", action="store_true", default=False, help="Visualize in realtime")
 args = parser.parse_args()
 

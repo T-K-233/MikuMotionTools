@@ -16,7 +16,7 @@ class MotionRetargeting:
     It takes in a mapping table, a source motion file, and a target model file.
     It then retargets the source motion to the target model.
 
-    The mapping table is a dictionary that maps the target body names to the source body 
+    The mapping table is a dictionary that maps the target body names to the source body
     information, containing the following keys:
         - body: the name of the body in the source model
         - weight: the weight / cost of each body in the IK solver, containing:
@@ -86,11 +86,6 @@ class MotionRetargeting:
             fps=self.fps,
         )
         self.target_body_indices = self.target_motion.get_body_indices(self.target_body_names)
-        # copy over the body motion data
-        self.target_motion._body_positions[:, :, :] = self.source_motion.body_positions[:, self.target_body_indices, :]
-        self.target_motion._body_rotations[:, :, :] = self.source_motion.body_rotations[:, self.target_body_indices, :]
-        self.target_motion._body_linear_velocities[:, :, :] = self.source_motion.body_linear_velocities[:, self.target_body_indices, :]
-        self.target_motion._body_angular_velocities[:, :, :] = self.source_motion.body_angular_velocities[:, self.target_body_indices, :]
 
         self.tasks = []
         self.frame_tasks = {}
@@ -111,7 +106,7 @@ class MotionRetargeting:
 
         # add a posture task to keep the body in a reasonable posture
         # this task acts like a low-priority regularizer, biasing the solution towards
-        # the default joint configuration, which is particularly helpful to avoid joint 
+        # the default joint configuration, which is particularly helpful to avoid joint
         # locking up by itself from gimbal lock problem
         posture_task = mink.PostureTask(model, cost=0.1)
         self.tasks.append(posture_task)
@@ -205,8 +200,23 @@ class MotionRetargeting:
                 error = self.solve_ik()
                 num_iter += 1
 
+            # forward kinematics to update body positions and orientations
+            mujoco.mj_forward(self.model, self.data)
+
             # store the joint motion data
             self.target_motion._dof_positions[frame_idx, :] = self.data.qpos[7:]
+
+            # extract body data from the MuJoCo robot after IK solving
+            for i, body_name in enumerate(self.target_body_names):
+                body_id = self.model.body(body_name).id
+
+                # body position and rotation in world frame
+                self.target_motion._body_positions[frame_idx, i, :] = self.data.xpos[body_id]
+                self.target_motion._body_rotations[frame_idx, i, :] = self.data.xquat[body_id]
+
+                # body linear and angular velocities in world frame
+                self.target_motion._body_linear_velocities[frame_idx, i, :] = self.data.cvel[body_id][3:6]
+                self.target_motion._body_angular_velocities[frame_idx, i, :] = self.data.cvel[body_id][0:3]
 
             # visualize at fixed FPS
             self.viewer.sync()
