@@ -25,7 +25,7 @@ class MotionRetargeting:
         - offset: the offset from the source body to the target body in the world frame, containing:
             - position: the position offset in (x, y, z) in meters
             - orientation: the orientation offset in (w, x, y, z) quaternion
-    
+
     An example mapping table is shown below:
     ```python
     {
@@ -85,6 +85,12 @@ class MotionRetargeting:
             body_names=self.target_body_names,
             fps=self.fps,
         )
+        self.target_body_indices = self.target_motion.get_body_indices(self.target_body_names)
+        # copy over the body motion data
+        self.target_motion._body_positions[:, :, :] = self.source_motion.body_positions[:, self.target_body_indices, :]
+        self.target_motion._body_rotations[:, :, :] = self.source_motion.body_rotations[:, self.target_body_indices, :]
+        self.target_motion._body_linear_velocities[:, :, :] = self.source_motion.body_linear_velocities[:, self.target_body_indices, :]
+        self.target_motion._body_angular_velocities[:, :, :] = self.source_motion.body_angular_velocities[:, self.target_body_indices, :]
 
         self.tasks = []
         self.frame_tasks = {}
@@ -162,51 +168,50 @@ class MotionRetargeting:
         if realtime:
             self.rate = RateLimiter(frequency=self.fps, warn=False)
 
-        loop_forever = True
-        while loop_forever:
-            for frame_idx in range(self.num_frames):
-                # update task targets
-                for target_body_name, match_entry in self.mapping_table.items():
-                    source_bone_name = match_entry["body"]
+        for frame_idx in range(self.num_frames):
+            # update task targets
+            for target_body_name, match_entry in self.mapping_table.items():
+                source_bone_name = match_entry["body"]
 
-                    # TODO: might be better to optimize the following logic with numpy vectorization
-                    source_body_index = self.source_motion.get_body_indices([source_bone_name])[0]
+                # TODO: might be better to optimize the following logic with numpy vectorization
+                source_body_index = self.source_motion.get_body_indices([source_bone_name])[0]
 
-                    source_position = self.source_motion.body_positions[frame_idx, source_body_index]
-                    source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index]
+                source_position = self.source_motion.body_positions[frame_idx, source_body_index]
+                source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index]
 
-                    # apply the offsets
-                    position_offset = match_entry["offset"]["position"]
-                    orientation_offset = match_entry["offset"]["orientation"]
-                    target_position = source_position + position_offset
-                    target_orientation = quat_mul(source_orientation, orientation_offset)
+                # apply the offsets
+                position_offset = match_entry["offset"]["position"]
+                orientation_offset = match_entry["offset"]["orientation"]
+                target_position = source_position + position_offset
+                target_orientation = quat_mul(source_orientation, orientation_offset)
 
-                    self.frame_tasks[target_body_name].set_target(mink.SE3(
-                        wxyz_xyz=np.concatenate([target_orientation, target_position])
-                    ))
+                self.frame_tasks[target_body_name].set_target(mink.SE3(
+                    wxyz_xyz=np.concatenate([target_orientation, target_position])
+                ))
 
-                    # move the frame mocap body to the current body pose
-                    mink.move_mocap_to_frame(self.model, self.data, f"{target_body_name}_current", target_body_name, "body")
-                    # move the target frame mocap body to the target pose
-                    mocap_id = self.model.body(f"{target_body_name}_target").mocapid[0]
-                    self.data.mocap_pos[mocap_id] = target_position
-                    self.data.mocap_quat[mocap_id] = target_orientation
+                # move the frame mocap body to the current body pose
+                mink.move_mocap_to_frame(self.model, self.data, f"{target_body_name}_current", target_body_name, "body")
+                # move the target frame mocap body to the target pose
+                mocap_id = self.model.body(f"{target_body_name}_target").mocapid[0]
+                self.data.mocap_pos[mocap_id] = target_position
+                self.data.mocap_quat[mocap_id] = target_orientation
 
-                prev_error = self.calculate_error()
-                num_iter = 0
+            prev_error = self.calculate_error()
+            num_iter = 0
 
+            error = self.solve_ik()
+            while prev_error - error > 0.001 and num_iter < self.max_iter:
+                prev_error = error
                 error = self.solve_ik()
-                while prev_error - error > 0.001 and num_iter < self.max_iter:
-                    prev_error = error
-                    error = self.solve_ik()
-                    num_iter += 1
+                num_iter += 1
 
-                self.target_motion._dof_positions[frame_idx, :] = self.data.qpos[7:]
+            # store the joint motion data
+            self.target_motion._dof_positions[frame_idx, :] = self.data.qpos[7:]
 
-                # visualize at fixed FPS
-                self.viewer.sync()
-                if realtime:
-                    self.rate.sleep()
+            # visualize at fixed FPS
+            self.viewer.sync()
+            if realtime:
+                self.rate.sleep()
 
         # compute the velocities
         self.target_motion._dof_velocities[1:] = np.diff(self.target_motion._dof_positions, axis=0) / (1. / self.fps)
