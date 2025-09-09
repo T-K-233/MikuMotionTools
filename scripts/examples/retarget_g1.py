@@ -161,7 +161,7 @@ if __name__ == "__main__":
                 },
             }
         case "hxg_humanoid":
-            robot_xml = "/home/tk/Downloads/Hxg-Humanoid/data/robots/hxg/hxg_humanoid/mjcf/scene.xml"
+            robot_xml = "/home/tk/Desktop/AIR/source/air/data/robots/hxg/hxg_humanoid/mjcf/scene_mocap.xml"
             mapping_table = {
                 "pelvis_link": {
                     "body": "pelvis",
@@ -170,11 +170,11 @@ if __name__ == "__main__":
                         "orientation": 1.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.1],
+                        "position": [0.0, 0.0, 0.0],
                         "orientation": [1.0, 0.0, 0.0, 0.0],
                     }
                 },
-                "left_elbow_yaw_lihnk": {
+                "left_elbow_yaw_link": {
                     "body": "left_hand",
                     "weight": {
                         "position": 10.0,
@@ -227,7 +227,7 @@ if __name__ == "__main__":
                         "orientation": 0.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.08],
+                        "position": [0.0, 0.0, 0.00],
                         "orientation": [1.0, 0.0, 0.0, 0.0],
                     }
                 },
@@ -249,7 +249,7 @@ if __name__ == "__main__":
                         "orientation": 0.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.08],
+                        "position": [0.0, 0.0, 0.0],
                         "orientation": [1.0, 0.0, 0.0, 0.0],
                     }
                 },
@@ -293,7 +293,7 @@ if __name__ == "__main__":
                         "orientation": 0.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.08],
+                        "position": [0.0, 0.0, 0.0],
                         "orientation": [1.0, 0.0, 0.0, 0.0],
                     }
                 },
@@ -304,7 +304,7 @@ if __name__ == "__main__":
                         "orientation": 0.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.08],
+                        "position": [0.0, 0.0, 0.0],
                         "orientation": [1.0, 0.0, 0.0, 0.0],
                     }
                 },
