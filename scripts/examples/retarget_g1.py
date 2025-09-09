@@ -199,24 +199,24 @@ if __name__ == "__main__":
                     }
                 },
                 "left_foot_link": {
-                    "body": "left_foot",
+                    "body": "left_ankle",
                     "weight": {
                         "position": 10.0,
                         "orientation": 2.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.0],
+                        "position": [0.0, 0.0, -0.05],
                         "orientation": [0.707, 0.0, -0.707, 0.0],
                     }
                 },
                 "right_foot_link": {
-                    "body": "right_foot",
+                    "body": "right_ankle",
                     "weight": {
                         "position": 10.0,
                         "orientation": 2.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, 0.0],
+                        "position": [0.0, 0.0, -0.05],
                         "orientation": [0.707, 0.0, -0.707, 0.0],
                     }
                 },
