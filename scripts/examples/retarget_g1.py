@@ -205,7 +205,7 @@ if __name__ == "__main__":
                         "orientation": 2.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, -0.05],
+                        "position": [0.0, 0.0, -0.1],
                         "orientation": [0.707, 0.0, -0.707, 0.0],
                     }
                 },
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                         "orientation": 2.0,
                     },
                     "offset": {
-                        "position": [0.0, 0.0, -0.05],
+                        "position": [0.0, 0.0, -0.1],
                         "orientation": [0.707, 0.0, -0.707, 0.0],
                     }
                 },
