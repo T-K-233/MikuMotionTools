@@ -19,58 +19,591 @@ see https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L26
 and https://chingswy.github.io/easymocap-public-doc/database/2_keypoints.html#smpl
 
 """
-accad = {
-    "pelvis":           {"bone": "Hips", "quat": [0.609, 0.359, 0.359, -0.609]},  # 0
-    "left_hip":         {"bone": "LeftUpLeg",        },  # 1
-    "right_hip":        {"bone": "RightUpLeg",        },  # 2
-    "spine1":           {"bone": "ToSpine", "func": lambda b: b.tail },  # 3
-    "left_knee":        {"bone": "LeftLeg",      },  # 4
-    "right_knee":       {"bone": "RightLeg",      },  # 5
-    "spine2":           {"bone": "Spine",     },  # 6
-    "left_ankle":       {"bone": "LeftFoot", "quat": [0.123, 0.696, 0.696, -0.123]},  # 7
-    "right_ankle":      {"bone": "RightFoot", "quat": [0.123, 0.696, 0.696, -0.123]},  # 8
-    "spine3":           {"bone": "Spine1",     },  # 9
-    "left_foot":        {"bone": "LeftToeBase", "quat": [0.062, -0.704, -0.704, -0.062]},  # 10
-    "right_foot":       {"bone": "RightToeBase", "quat": [0.062, -0.704, -0.704, -0.062]},  # 11
-    "neck":             {"bone": "Neck",          },  # 12
-    "left_collar":      {"bone": "LeftShoulder",        },  # 13
-    "right_collar":     {"bone": "RightShoulder",        },  # 14
-    "head":             {"bone": "Head", "quat": [0.455, -0.542, -0.542, -0.455]},  # 15
-    "left_shoulder":    {"bone": "LeftArm",        },  # 16
-    "right_shoulder":   {"bone": "RightArm",        },  # 17
-    "left_elbow":       {"bone": "LeftForeArm",      },  # 18
-    "right_elbow":      {"bone": "RightForeArm",      },  # 19
-    "left_wrist":       {"bone": "LeftHand", "quat": [0.5, 0.5, -0.5, 0.5]},  # 20
-    "right_wrist":      {"bone": "RightHand", "quat": [0.5, 0.5, -0.5, 0.5]},  # 21
-    "left_hand":        {"bone": "LeftHand", "func": lambda b: b.tail, "quat": [0.5, 0.5, -0.5, 0.5]},  # 22
-    "right_hand":       {"bone": "RightHand", "func": lambda b: b.tail, "quat": [0.5, 0.5, -0.5, 0.5]},  # 23
+
+
+G1_ACCAD_MAPPING = {
+    "pelvis": {  # 0
+        "source": "Hips",
+        "target": "pelvis",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.609, 0.359, 0.359, -0.609),
+        },
+        "weight": {
+            "position": 10.0,
+            "orientation": 1.0,
+        },
+    },
+    "left_hip": {  # 1
+        "source": "LeftUpLeg",
+        "target": "left_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_hip": {  # 2
+        "source": "RightUpLeg",
+        "target": "right_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "spine1": {  # 3
+        "source": "ToSpine",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_knee": {  # 4
+        "source": "LeftLeg",
+        "target": "left_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_knee": {  # 5
+        "source": "RightLeg",
+        "target": "right_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "spine2": {  # 6
+        "source": "Spine",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_ankle": {  # 7
+        "source": "LeftFoot",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.123, 0.696, 0.696, -0.123),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_ankle": {  # 8
+        "source": "RightFoot",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.123, 0.696, 0.696, -0.123),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "spine3": {  # 9
+        "source": "Spine1",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_foot": {  # 10
+        "source": "LeftToeBase",
+        "target": "left_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.062, -0.704, -0.704, -0.062),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_foot": {  # 11
+        "source": "RightToeBase",
+        "target": "right_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.062, -0.704, -0.704, -0.062),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "neck": {  # 12
+        "source": "Neck",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_collar": {  # 13
+        "source": "LeftShoulder",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_collar": {  # 14
+        "source": "RightShoulder",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "head": {  # 15
+        "source": "Head",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.455, -0.542, -0.542, -0.455),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_shoulder": {  # 16
+        "source": "LeftArm",
+        "target": "left_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_shoulder": {  # 17
+        "source": "RightArm",
+        "target": "right_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_elbow": {  # 18
+        "source": "LeftForeArm",
+        "target": "left_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_elbow": {  # 19
+        "source": "RightForeArm",
+        "target": "right_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_wrist": {  # 20
+        "source": "LeftHand",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_wrist": {  # 21
+        "source": "RightHand",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_hand": {  # 22
+        "source": "LeftHand",
+        "target": "left_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_hand": {  # 23
+        "source": "RightHand",
+        "target": "right_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
 }
-# actorcore = {
-#     "pelvis"            : "CC_Base_Pelvis",        lambda b: b.head),  # 0
-#     "left_hip"          : ("CC_Base_L_Thigh",       lambda b: b.head),  # 1
-#     "right_hip"         : ("CC_Base_R_Thigh",       lambda b: b.head),  # 2
-#     "spine1"            : ("CC_Base_Spine02",       lambda b: b.head),  # 3
-#     "left_knee"         : ("CC_Base_L_Calf",        lambda b: b.head),  # 4
-#     "right_knee"        : ("CC_Base_R_Calf",        lambda b: b.head),  # 5
-#     "spine2"            : ("CC_Base_Spine02",       lambda b: b.head),  # 6
-#     "left_ankle"        : ("CC_Base_L_Foot",        lambda b: b.head),  # 7
-#     "right_ankle"       : ("CC_Base_R_Foot",        lambda b: b.head),  # 8
-#     "spine3"            : ("CC_Base_Spine02",       lambda b: b.head),  # 9
-#     "left_foot"         : ("CC_Base_L_Foot",        lambda b: b.tail),  # 10
-#     "right_foot"        : ("CC_Base_R_Foot",        lambda b: b.tail),  # 11
-#     "neck"              : ("CC_Base_R_Foot",        lambda b: b.tail),  # 12
-#     "left_collar"       : ("CC_Base_L_Clavicle",    lambda b: b.tail),  # 13
-#     "right_collar"      : ("CC_Base_L_Clavicle",    lambda b: b.tail),  # 14
-#     "head"              : ("CC_Base_Head",          lambda b: b.tail),  # 15
-#     "left_shoulder"     : ("CC_Base_L_Clavicle",    lambda b: b.tail),  # 16
-#     "right_shoulder"    : ("CC_Base_R_Clavicle",    lambda b: b.tail),  # 17
-#     "left_elbow"        : ("CC_Base_L_Forearm",     lambda b: b.head),  # 18
-#     "right_elbow"       : ("CC_Base_R_Forearm",     lambda b: b.head),  # 19
-#     "left_wrist"        : ("CC_Base_L_Hand",        lambda b: b.head),  # 20
-#     "right_wrist"       : ("CC_Base_R_Hand",        lambda b: b.head),  # 21
-#     "left_hand"         : ("CC_Base_L_Hand",        lambda b: b.tail),  # 22
-#     "right_hand"        : ("CC_Base_R_Hand",        lambda b: b.tail),  # 23
-# }
+
+
+G1_ACTORCORE_MAPPING = {
+    "pelvis": {  # 0
+        "source": "CC_Base_Pelvis",
+        "target": "pelvis",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 10.0,
+            "orientation": 1.0,
+        },
+    },
+    "left_hip": {  # 1
+        "source": "CC_Base_L_Thigh",
+        "target": "left_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_hip": {  # 2
+        "source": "CC_Base_R_Thigh",
+        "target": "right_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "spine1": {  # 3
+        "source": "CC_Base_Spine02",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_knee": {  # 4
+        "source": "CC_Base_L_Calf",
+        "target": "left_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_knee": {  # 5
+        "source": "CC_Base_R_Calf",
+        "target": "right_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "spine2": {  # 6
+        "source": "CC_Base_Spine02",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_ankle": {  # 7
+        "source": "CC_Base_L_Foot",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_ankle": {  # 8
+        "source": "CC_Base_R_Foot",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "spine3": {  # 9
+        "source": "CC_Base_Spine02",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_foot": {  # 10
+        "source": "CC_Base_L_Foot",
+        "target": "left_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_foot": {  # 11
+        "source": "CC_Base_R_Foot",
+        "target": "right_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "neck": {  # 12
+        "source": "CC_Base_R_Foot",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_collar": {  # 13
+        "source": "CC_Base_L_Clavicle",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_collar": {  # 14
+        "source": "CC_Base_L_Clavicle",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "head": {  # 15
+        "source": "CC_Base_Head",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_shoulder": {  # 16
+        "source": "CC_Base_L_Clavicle",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_shoulder": {  # 17
+        "source": "CC_Base_R_Clavicle",
+        "target": "right_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_elbow": {  # 18
+        "source": "CC_Base_L_Forearm",
+        "target": "left_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_elbow": {  # 19
+        "source": "CC_Base_R_Forearm",
+        "target": "right_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_wrist": {  # 20
+        "source": "CC_Base_L_Hand",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_wrist": {  # 21
+        "source": "CC_Base_R_Hand",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_hand": {  # 22
+        "source": "CC_Base_L_Hand",
+        "target": "left_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_hand": {  # 23
+        "source": "CC_Base_R_Hand",
+        "target": "right_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+}
+
 
 G1_MMD_YYB_MAPPING = {
     "pelvis": {  # 0
@@ -362,41 +895,419 @@ G1_MMD_YYB_MAPPING = {
         },
     },
 }
-# mixamo = {
-#     "pelvis"            : ("mixamorig:Hips",            lambda b: b.head),
-#     "left_shoulder"     : ("mixamorig:LeftArm",         lambda b: b.head),
-#     "left_elbow"        : ("mixamorig:LeftForeArm",     lambda b: b.head),
-#     "left_hand"         : ("mixamorig:LeftHand",        lambda b: b.head),
-#     "right_shoulder"    : ("mixamorig:RightArm",        lambda b: b.head),
-#     "right_elbow"       : ("mixamorig:RightForeArm",    lambda b: b.head),
-#     "right_hand"        : ("mixamorig:RightHand",       lambda b: b.head),
-#     "left_hip"          : ("mixamorig:LeftUpLeg",       lambda b: b.head),
-#     "left_knee"         : ("mixamorig:LeftLeg",         lambda b: b.head),
-#     "left_foot"         : ("mixamorig:LeftToeBase",     lambda b: b.head),
-#     "right_hip"         : ("mixamorig:RightUpLeg",      lambda b: b.head),
-#     "right_knee"        : ("mixamorig:RightLeg",        lambda b: b.head),
-#     "right_foot"        : ("mixamorig:RightToeBase",    lambda b: b.head),
-#     "chest"             : ("mixamorig:Spine1",          lambda b: b.head),
-#     "head"              : ("mixamorig:Head",            lambda b: b.head),
-# }
-# meshcapade = {
-#     "pelvis"                    : ("pelvis",        lambda b: b.head),
-#     "left_shoulder_roll_link"   : ("upperarm_l",    lambda b: b.head),
-#     "left_elbow_link"           : ("lowerarm_l",    lambda b: b.head),
-#     "left_wrist_pitch_link"     : ("hand_l",        lambda b: b.head),
-#     "left_rubber_hand"          : ("hand_l",        lambda b: b.tail),
-#     "right_shoulder_roll_link"  : ("upperarm_r",    lambda b: b.head),
-#     "right_elbow_link"          : ("lowerarm_r",    lambda b: b.head),
-#     "right_wrist_pitch_link"    : ("hand_r",        lambda b: b.head),
-#     "right_rubber_hand"         : ("hand_r",        lambda b: b.tail),
-#     "torso_link"                : ("torso",         lambda b: b.head),
-#     "head_link"                 : ("head",          lambda b: b.head),
-#     "left_hip_roll_link"        : ("thigh_l",       lambda b: b.head),
-#     "left_knee_link"            : ("calf_l",        lambda b: b.head),
-#     "left_ankle_pitch_link"     : ("foot_l",        lambda b: b.head),
-#     "left_ankle_roll_link"      : ("ball_l",        lambda b: b.head),
-#     "right_hip_roll_link"       : ("thigh_r",       lambda b: b.head),
-#     "right_knee_link"           : ("calf_r",        lambda b: b.head),
-#     "right_ankle_pitch_link"    : ("foot_r",        lambda b: b.head),
-#     "right_ankle_roll_link"     : ("ball_r",        lambda b: b.head),
-# }
+
+
+G1_MIXAMO_MAPPING = {
+    "pelvis": {  # 0
+        "source": "mixamorig:Hips",
+        "target": "pelvis",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 10.0,
+            "orientation": 1.0,
+        },
+    },
+    "left_shoulder": {  # 16
+        "source": "mixamorig:LeftArm",
+        "target": "left_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_elbow": {  # 18
+        "source": "mixamorig:LeftForeArm",
+        "target": "left_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_hand": {  # 22
+        "source": "mixamorig:LeftHand",
+        "target": "left_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_shoulder": {  # 17
+        "source": "mixamorig:RightArm",
+        "target": "right_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_elbow": {  # 19
+        "source": "mixamorig:RightForeArm",
+        "target": "right_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_hand": {  # 23
+        "source": "mixamorig:RightHand",
+        "target": "right_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "left_hip": {  # 1
+        "source": "mixamorig:LeftUpLeg",
+        "target": "left_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_knee": {  # 4
+        "source": "mixamorig:LeftLeg",
+        "target": "left_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_foot": {  # 10
+        "source": "mixamorig:LeftToeBase",
+        "target": "left_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_hip": {  # 2
+        "source": "mixamorig:RightUpLeg",
+        "target": "right_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_knee": {  # 5
+        "source": "mixamorig:RightLeg",
+        "target": "right_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_foot": {  # 11
+        "source": "mixamorig:RightToeBase",
+        "target": "right_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "spine3": {  # 9
+        "source": "mixamorig:Spine1",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "head": {  # 15
+        "source": "mixamorig:Head",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+}
+
+
+G1_MESHCAPADE_MAPPING = {
+    "pelvis": {  # 0
+        "source": "pelvis",
+        "target": "pelvis",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 10.0,
+            "orientation": 1.0,
+        },
+    },
+    "left_shoulder": {  # 16
+        "source": "upperarm_l",
+        "target": "left_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_elbow": {  # 18
+        "source": "lowerarm_l",
+        "target": "left_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_wrist": {  # 20
+        "source": "hand_l",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_hand": {  # 22
+        "source": "hand_l",
+        "target": "left_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_shoulder": {  # 17
+        "source": "upperarm_r",
+        "target": "right_shoulder_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_elbow": {  # 19
+        "source": "lowerarm_r",
+        "target": "right_elbow_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_wrist": {  # 21
+        "source": "hand_r",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_hand": {  # 23
+        "source": "hand_r",
+        "target": "right_rubber_hand",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "spine2": {  # 6
+        "source": "torso",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "head": {  # 15
+        "source": "head",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_hip": {  # 1
+        "source": "thigh_l",
+        "target": "left_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_knee": {  # 4
+        "source": "calf_l",
+        "target": "left_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_ankle": {  # 7
+        "source": "foot_l",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "left_foot": {  # 10
+        "source": "ball_l",
+        "target": "left_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+    "right_hip": {  # 2
+        "source": "thigh_r",
+        "target": "right_hip_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_knee": {  # 5
+        "source": "calf_r",
+        "target": "right_knee_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_ankle": {  # 8
+        "source": "foot_r",
+        "target": "",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 0.0,
+            "orientation": 0.0,
+        },
+    },
+    "right_foot": {  # 11
+        "source": "ball_r",
+        "target": "right_ankle_roll_link",
+        "offset": {
+            "position": (0.0, 0.0, 0.0),
+            "orientation": (1.0, 0.0, 0.0, 0.0),
+        },
+        "weight": {
+            "position": 1.0,
+            "orientation": 1.0,
+        },
+    },
+}
