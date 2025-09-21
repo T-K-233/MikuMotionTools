@@ -2,11 +2,13 @@
 Ubuntu:
 ```bash
 blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/extract_g1_zamuza.py
+uv run ./scripts/compute_dof_ik.py --motion ./data/motions/g1_zamuza_0_1632.npz --mapping G1_MMD_YYB_MAPPING
 ```
 
 Windows:
 ```powershell
 D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\extract_g1_zamuza.py
+uv run ./scripts/compute_dof_ik.py --motion ./data/motions/g1_zamuza_0_1632.npz --mapping G1_MMD_YYB_MAPPING
 ```
 """
 
@@ -38,15 +40,13 @@ O = bpy.ops
 """ Everything else follows """
 
 import numpy as np
-from mikumotion.presets import GenericKeypointMapping
+from mikumotion.presets import G1_MMD_YYB_MAPPING
 from mikumotion.blender import (
     set_scene_animation_range,
     build_body_motion_data,
     set_armature_to_rest,
     set_armature_to_pose,
 )
-from mikumotion.math import quat_mul, quat_from_euler_xyz
-
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
@@ -62,7 +62,7 @@ set_armature_to_pose(source_armature)
 
 scaling_ratio = 0.9
 
-motion = build_body_motion_data(source_armature, mapping=GenericKeypointMapping.mmd_yyb, scaling_ratio=scaling_ratio)
+motion = build_body_motion_data(source_armature, mapping=G1_MMD_YYB_MAPPING, scaling_ratio=scaling_ratio)
 
 save_path = f"./data/motions/g1_zamuza_{motion_section[0]}_{motion_section[1]}_body_only.npz"
 motion.save(save_path)

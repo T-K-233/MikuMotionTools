@@ -29,16 +29,17 @@ class MotionRetargeting:
     An example mapping table is shown below:
     ```python
     {
-        "pelvis_link": {
-            "body": "pelvis",
+        "pelvis": {
+            "source": "腰",
+            "target": "pelvis_link",
+            "offset": {
+                "position": (0.0, 0.0, 0.0),
+                "orientation": (1.0, 0.0, 0.0, 0.0),
+            },
             "weight": {
                 "position": 10.0,
                 "orientation": 1.0,
             },
-            "offset": {
-                "position": [0.0, 0.0, 0.0],
-                "orientation": [1.0, 0.0, 0.0, 0.0],
-            }
         },
         ...
     }
@@ -68,8 +69,6 @@ class MotionRetargeting:
         self.damping = damping
         self.max_iter = max_iter
 
-        self.target_body_names = list(self.mapping_table.keys())
-
         model = mujoco.MjModel.from_xml_path(self.robot_xml)
         self.configuration = mink.Configuration(model)
 
@@ -82,26 +81,28 @@ class MotionRetargeting:
         self.target_motion = MotionSequence(
             num_frames=self.num_frames,
             dof_names=[model.joint(1 + i).name for i in range(model.nu)],
-            body_names=self.target_body_names,
+            body_names=self.source_motion.body_names,
             fps=self.fps,
         )
-        self.target_body_indices = self.target_motion.get_body_indices(self.target_body_names)
 
         self.tasks = []
         self.frame_tasks = {}
 
-        for target_body_name, match_entry in self.mapping_table.items():
-            position_weight = match_entry["weight"]["position"]
-            orientation_weight = match_entry["weight"]["orientation"]
+        for body_name in self.source_motion.body_names:
+            mapping_entry = self.mapping_table[body_name]
+            target_bone_name = mapping_entry["target"]
+            position_weight = mapping_entry["weight"]["position"]
+            orientation_weight = mapping_entry["weight"]["orientation"]
 
+            print(f"Adding task for {body_name} ({target_bone_name})")
             task = mink.FrameTask(
-                frame_name=target_body_name,
+                frame_name=target_bone_name,
                 frame_type="body",
                 position_cost=position_weight,
                 orientation_cost=orientation_weight,
                 lm_damping=1.0,
             )
-            self.frame_tasks[target_body_name] = task
+            self.frame_tasks[target_bone_name] = task
             self.tasks.append(task)
 
         # add a posture task to keep the body in a reasonable posture
@@ -165,31 +166,26 @@ class MotionRetargeting:
 
         for frame_idx in range(self.num_frames):
             # update task targets
-            for target_body_name, match_entry in self.mapping_table.items():
-                source_bone_name = match_entry["body"]
+            for body_name in self.source_motion.body_names:
+                mapping_entry = self.mapping_table[body_name]
+                target_bone_name = mapping_entry["target"]
 
                 # TODO: might be better to optimize the following logic with numpy vectorization
-                source_body_index = self.source_motion.get_body_indices([source_bone_name])[0]
+                source_body_index = self.source_motion.get_body_indices([body_name])[0]
 
                 source_position = self.source_motion.body_positions[frame_idx, source_body_index]
                 source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index]
 
-                # apply the offsets
-                position_offset = match_entry["offset"]["position"]
-                orientation_offset = match_entry["offset"]["orientation"]
-                target_position = source_position + position_offset
-                target_orientation = quat_mul(source_orientation, orientation_offset)
-
-                self.frame_tasks[target_body_name].set_target(mink.SE3(
-                    wxyz_xyz=np.concatenate([target_orientation, target_position])
+                self.frame_tasks[target_bone_name].set_target(mink.SE3(
+                    wxyz_xyz=np.concatenate([source_orientation, source_position])
                 ))
 
                 # move the frame mocap body to the current body pose
-                mink.move_mocap_to_frame(self.model, self.data, f"{target_body_name}_current", target_body_name, "body")
+                mink.move_mocap_to_frame(self.model, self.data, f"{target_bone_name}_current", target_bone_name, "body")
                 # move the target frame mocap body to the target pose
-                mocap_id = self.model.body(f"{target_body_name}_target").mocapid[0]
-                self.data.mocap_pos[mocap_id] = target_position
-                self.data.mocap_quat[mocap_id] = target_orientation
+                mocap_id = self.model.body(f"{target_bone_name}_target").mocapid[0]
+                self.data.mocap_pos[mocap_id] = source_position
+                self.data.mocap_quat[mocap_id] = source_orientation
 
             prev_error = self.calculate_error()
             num_iter = 0
@@ -207,8 +203,9 @@ class MotionRetargeting:
             self.target_motion._dof_positions[frame_idx, :] = self.data.qpos[7:]
 
             # extract body data from the MuJoCo robot after IK solving
-            for i, body_name in enumerate(self.target_body_names):
-                body_id = self.model.body(body_name).id
+            for i, body_name in enumerate(self.source_motion.body_names):
+                mapping_entry = self.mapping_table[body_name]
+                body_id = self.model.body(mapping_entry["target"]).id
 
                 # body position and rotation in world frame
                 self.target_motion._body_positions[frame_idx, i, :] = self.data.xpos[body_id]
