@@ -50,7 +50,7 @@ class MotionSequence:
 
     def __init__(self, num_frames: int, dof_names: list[str], body_names: list[str], fps: int = 50) -> None:
         """Initialize a MotionSequence object.
-        
+
         Args:
             num_frames: Number of frames.
             dof_names: List of joint names.
@@ -150,7 +150,7 @@ class MotionSequence:
         """Rigid body angular velocities."""
         return self._body_angular_velocities
 
-    def get_dof_index(self, dof_names: list[str]) -> list[int]:
+    def get_dof_indices(self, dof_names: list[str]) -> list[int]:
         """Get joint indexes by joint names.
 
         Args:
@@ -168,7 +168,7 @@ class MotionSequence:
             indexes.append(self._dof_names.index(name))
         return indexes
 
-    def get_body_index(self, body_names: list[str]) -> list[int]:
+    def get_body_indices(self, body_names: list[str]) -> list[int]:
         """Get rigid body indexes by rigid body names.
 
         Args:
@@ -215,7 +215,7 @@ class MotionSequence:
 
     def save(self, path: str) -> None:
         """Save the motion data to a file.
-        
+
         Args:
             path: The path to the output file.
         """

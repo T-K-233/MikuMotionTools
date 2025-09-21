@@ -204,3 +204,6 @@ __marimo__/
 
 # Blender projects
 blender-projects/
+
+# Robot description files
+data/robots/

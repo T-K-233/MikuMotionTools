@@ -10,7 +10,8 @@ from mikumotion.motion_sequence import MotionSequence
 from mikumotion.viewers import MatplotViewer
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--file", type=str, required=True, help="Motion file")
+parser.add_argument("--motion", type=str, required=True, help="Motion file")
+parser.add_argument("--robot", type=str, default="smplx", help="Robot name to select which frame to show")
 parser.add_argument(
     "--render-scene",
     action="store_true",
@@ -26,9 +27,15 @@ args, _ = parser.parse_known_args()
 # https://matplotlib.org/stable/users/explain/figure/backends.html#interactive-backends
 matplotlib.use(args.matplotlib_backend)
 
-motion = MotionSequence.load(args.file)
+motion = MotionSequence.load(args.motion)
 
-g1_frames = ["pelvis", "left_rubber_hand", "right_rubber_hand", "left_ankle_roll_link", "right_ankle_roll_link"]
+match args.robot:
+    case "smplx":
+        frames = ["pelvis", "left_hand", "right_hand", "left_ankle", "right_ankle", "left_foot", "right_foot", "head"]
+    case "unitree_g1":
+        frames = ["pelvis", "left_rubber_hand", "right_rubber_hand", "left_ankle_roll_link", "right_ankle_roll_link"]
+    case _:
+        frames = []
 
-viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=g1_frames)
+viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=frames)
 viewer.show()

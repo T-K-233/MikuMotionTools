@@ -1,12 +1,12 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/extract_g1_zamuza.py
+blender ./blender-projects/ACCAD_Female1_B03_Walk1.blend --python ./scripts/examples/extract_accad.py
 ```
 
 Windows:
 ```powershell
-D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\extract_g1_zamuza.py
+D:\Documents\Blender\blender.exe .\blender-projects\ACCAD_Female1_B03_Walk1.blend --python scripts\examples\extract_accad.py
 ```
 """
 
@@ -50,20 +50,19 @@ from mikumotion.math import quat_mul, quat_from_euler_xyz
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
-# motion_section = (0, 1632)
-motion_section = (0, 600)
+motion_section = (0, 460)
 
 set_scene_animation_range(motion_section[0], motion_section[1])
 
-source_armature = D.objects.get("YYB式初音ミクv1.02_arm")
+source_armature = D.objects.get("Female1_B03_Walk1")
 
 # set_armature_to_rest(source_armature)
 set_armature_to_pose(source_armature)
 
-scaling_ratio = 0.9
+scaling_ratio = 1.0
 
-motion = build_body_motion_data(source_armature, mapping=GenericKeypointMapping.mmd_yyb, scaling_ratio=scaling_ratio)
+motion = build_body_motion_data(source_armature, mapping=GenericKeypointMapping.accad, scaling_ratio=scaling_ratio)
 
-save_path = f"./data/motions/g1_zamuza_{motion_section[0]}_{motion_section[1]}_body_only.npz"
+save_path = f"./data/motions/accad_{motion_section[0]}_{motion_section[1]}_body_only.npz"
 motion.save(save_path)
 print(f"Results saved to {save_path}")

@@ -16,6 +16,8 @@
   </asset>
 
   <worldbody>
+    <!-- mocap markers -->
+    <!-- blue: current, green: target -->
     <body name="pelvis_target" pos="0.5 0 .5" mocap="true">
       <geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".3 .6 .3 .5" />
     </body>

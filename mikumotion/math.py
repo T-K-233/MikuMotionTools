@@ -79,7 +79,7 @@ def quat_mul(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
     """
     # Apply broadcasting to match shapes
     q1_broadcasted, q2_broadcasted = np.broadcast_arrays(q1, q2)
-    
+
     # reshape to (N, 4) for multiplication
     shape = q1_broadcasted.shape
     q1 = q1_broadcasted.reshape(-1, 4)
