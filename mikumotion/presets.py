@@ -607,11 +607,11 @@ G1_ACTORCORE_MAPPING = {
 
 G1_MMD_YYB_MAPPING = {
     "pelvis": {  # 0
-        "source": "腰",
+        "source": "下半身",
         "target": "pelvis",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (-0.327, 0.627, 0.627, 0.327),
+            "position": (0.0, 0.02, -0.03),
+            "orientation": (-0.561, -0.431, -0.431, 0.561),
         },
         "weight": {
             "position": 10.0,
@@ -806,7 +806,7 @@ G1_MMD_YYB_MAPPING = {
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
-            "position": 1.0,
+            "position": 2.0,
             "orientation": 0.0,
         },
     },
@@ -818,7 +818,7 @@ G1_MMD_YYB_MAPPING = {
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
-            "position": 1.0,
+            "position": 2.0,
             "orientation": 0.0,
         },
     },
@@ -874,7 +874,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "手首.L",
         "target": "left_rubber_hand",
         "offset": {
-            "position": (0.05, 0.0, -0.05),
+            "position": (0.1, 0.0, -0.1),
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
@@ -886,7 +886,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "手首.R",
         "target": "right_rubber_hand",
         "offset": {
-            "position": (-0.05, 0.0, -0.05),
+            "position": (-0.1, 0.0, -0.1),
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {

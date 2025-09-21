@@ -2,7 +2,7 @@
 Ubuntu:
 ```bash
 blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/retarget_g1_zamuza.py
-uv run ./scripts/compute_dof_ik.py --motion ./data/motions/g1_zamuza_0_1632.npz --mapping G1_MMD_YYB_MAPPING
+uv run ./scripts/compute_dof_ik.py --motion ./data/motions/g1_zamuza_0_1632_body_only.npz --mapping G1_MMD_YYB_MAPPING
 ```
 
 Windows:
@@ -51,8 +51,8 @@ from mikumotion.motion_sequence import rotate_motion
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
-# motion_section = (0, 1632)
-motion_section = (0, 600)
+motion_section = (0, 1632)
+# motion_section = (0, 600)
 
 set_scene_animation_range(motion_section[0], motion_section[1])
 

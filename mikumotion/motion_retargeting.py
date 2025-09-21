@@ -61,7 +61,7 @@ class MotionRetargeting:
         mapping_table: dict,
         solver: str = "daqp",
         damping: float = 0.5,
-        max_iter: int = 10,
+        max_iter: int = 20,
     ):
         self.motion_file = motion_file
         self.robot_xml = robot_xml

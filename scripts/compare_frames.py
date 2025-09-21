@@ -1,5 +1,12 @@
 """
-Script to view motion in MuJoCo with coordinate frames representing robot frames.
+Script to compare the frames of two motions, used to adjust mapping table.
+
+An example usage is as follows:
+```bash
+blender ./blender-projects/G1_USD.blend --python ./scripts/examples/export_g1_reset_pose.py
+blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/export_mmd_reset_pose.py
+uv run ./scripts/compare_frames.py
+```
 """
 
 import mujoco
