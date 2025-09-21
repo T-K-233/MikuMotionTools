@@ -7,6 +7,7 @@ import mujoco.viewer
 
 from mikumotion.math import quat_mul
 from mikumotion.motion_sequence import MotionSequence
+from mikumotion.mujoco_utils import add_body_frames
 
 
 class MotionRetargeting:
@@ -69,13 +70,19 @@ class MotionRetargeting:
         self.damping = damping
         self.max_iter = max_iter
 
-        model = mujoco.MjModel.from_xml_path(self.robot_xml)
-        self.configuration = mink.Configuration(model)
-
         # load the source motion
         self.source_motion = MotionSequence.load(self.motion_file)
         self.num_frames = self.source_motion.num_frames
         self.fps = self.source_motion.fps[0]
+
+        # add coordinate frames to the robot XML
+        xml = open(self.robot_xml).read()
+        xml = add_body_frames(xml, self.source_motion, prefix="current_", center_color=(0.0, 1.0, 1.0))
+        xml = add_body_frames(xml, self.source_motion, prefix="target_", center_color=(1.0, 0.0, 1.0))
+        open(self.robot_xml.replace(".xml", "_frames.xml"), "w").write(xml)
+
+        model = mujoco.MjModel.from_xml_path(self.robot_xml.replace(".xml", "_frames.xml"))
+        self.configuration = mink.Configuration(model)
 
         # create a new motion sequence for the retargeted motion
         self.target_motion = MotionSequence(
@@ -181,9 +188,9 @@ class MotionRetargeting:
                 ))
 
                 # move the frame mocap body to the current body pose
-                mink.move_mocap_to_frame(self.model, self.data, f"{target_bone_name}_current", target_bone_name, "body")
+                mink.move_mocap_to_frame(self.model, self.data, f"current_{body_name}_frame", target_bone_name, "body")
                 # move the target frame mocap body to the target pose
-                mocap_id = self.model.body(f"{target_bone_name}_target").mocapid[0]
+                mocap_id = self.model.body(f"target_{body_name}_frame").mocapid[0]
                 self.data.mocap_pos[mocap_id] = source_position
                 self.data.mocap_quat[mocap_id] = source_orientation
 

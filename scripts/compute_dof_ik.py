@@ -7,7 +7,7 @@ from mikumotion.presets import G1_MMD_YYB_MAPPING
 parser = argparse.ArgumentParser()
 parser.add_argument("--motion", type=str, help="Source motion file")
 parser.add_argument("--mapping", type=str, help="Mapping table")
-parser.add_argument("--realtime", action="store_true", default=False, help="Visualize in realtime")
+parser.add_argument("--real-time", action="store_true", default=False, help="Visualize in realtime")
 args = parser.parse_args()
 
 
@@ -16,10 +16,10 @@ if __name__ == "__main__":
 
     match args.mapping:
         case "G1_MMD_YYB_MAPPING":
-            robot_xml = "./data/robots/unitree/g1/mjcf/g1_29dof_mode_5_mocap.xml"
+            robot_xml = "./data/robots/unitree/g1/mjcf/g1_29dof_mode_5.xml"
             mapping_table = G1_MMD_YYB_MAPPING
         case _:
             raise ValueError(f"Unknown mapping table: {args.mapping}")
 
     retargeting = MotionRetargeting(motion_file, robot_xml, mapping_table)
-    retargeting.run(realtime=args.realtime)
+    retargeting.run(realtime=args.real_time)

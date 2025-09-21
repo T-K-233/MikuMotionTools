@@ -39,7 +39,6 @@ O = bpy.ops
 
 import numpy as np
 from mikumotion.presets import G1_MMD_YYB_MAPPING
-from mikumotion.motion_sequence import MotionSequence
 from mikumotion.blender import set_armature_to_rest, set_scene_animation_range, build_body_motion_data
 from mikumotion.motion_sequence import rotate_motion
 
@@ -53,9 +52,10 @@ set_armature_to_rest(armature)
 
 set_scene_animation_range(0, 1)
 
-scaling_ratio = 0.9
+scaling_ratio = 0.85
 motion = build_body_motion_data(armature, mapping=G1_MMD_YYB_MAPPING, scaling_ratio=scaling_ratio)
 
+# blender is +Y forward, we need to rotate to +X forward
 motion = rotate_motion(motion, np.pi / 2)
 
 save_path = "./data/motions/mmd_reset_pose.npz"

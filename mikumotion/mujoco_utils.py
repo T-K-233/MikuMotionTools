@@ -86,7 +86,7 @@ def add_body_frames(
 
         frame_xml = f"""
 <!-- {frame_name} frame -->
-<body name="{prefix}{frame_name}_frame" pos="{position_string}" quat="{orientation_string}">
+<body name="{prefix}{frame_name}_frame" pos="{position_string}" quat="{orientation_string}" mocap="true">
   <!-- X-axis (red) -->
   <geom name="{prefix}{frame_name}_x_axis" type="cylinder" size="{axis_size}" pos="{axis_length} 0 0" quat="0.707107 0 0.707107 0" rgba="0.8 0.2 0.2 0.75" />
   <!-- Y-axis (green) -->

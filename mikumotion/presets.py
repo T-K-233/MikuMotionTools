@@ -622,8 +622,8 @@ G1_MMD_YYB_MAPPING = {
         "source": "足.L",
         "target": "left_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.04, 0.0, -0.1),
+            "orientation": (0.5, 0.5, 0.5, -0.5),
         },
         "weight": {
             "position": 1.0,
@@ -634,8 +634,8 @@ G1_MMD_YYB_MAPPING = {
         "source": "足.R",
         "target": "right_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (-0.04, 0.0, -0.1),
+            "orientation": (0.5, 0.5, 0.5, -0.5),
         },
         "weight": {
             "position": 1.0,
@@ -658,8 +658,8 @@ G1_MMD_YYB_MAPPING = {
         "source": "ひざ.L",
         "target": "left_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.04, 0.0, -0.04),
+            "orientation": (0.5, 0.5, 0.5, -0.5),
         },
         "weight": {
             "position": 1.0,
@@ -670,8 +670,8 @@ G1_MMD_YYB_MAPPING = {
         "source": "ひざ.R",
         "target": "right_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (-0.04, 0.0, -0.04),
+            "orientation": (0.5, 0.5, 0.5, -0.5),
         },
         "weight": {
             "position": 1.0,
@@ -694,7 +694,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "足首.L",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.035, 0.0, 0.0),
             "orientation": (0.153, 0.690, 0.690, -0.153),
         },
         "weight": {
@@ -706,7 +706,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "足首.R",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (-0.035, 0.0, 0.0),
             "orientation": (0.153, 0.690, 0.690, -0.153),
         },
         "weight": {
@@ -730,7 +730,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "足先EX.L",
         "target": "left_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.035, 0.0, 0.0),
             "orientation": (0.0, 0.707, 0.707, 0.0),
         },
         "weight": {
@@ -742,7 +742,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "足先EX.R",
         "target": "right_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (-0.035, 0.0, 0.0),
             "orientation": (0.0, 0.707, 0.707, 0.0),
         },
         "weight": {
@@ -803,7 +803,7 @@ G1_MMD_YYB_MAPPING = {
         "target": "left_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
             "position": 1.0,
@@ -815,7 +815,7 @@ G1_MMD_YYB_MAPPING = {
         "target": "right_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
             "position": 1.0,
@@ -827,7 +827,7 @@ G1_MMD_YYB_MAPPING = {
         "target": "left_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
             "position": 1.0,
@@ -839,7 +839,7 @@ G1_MMD_YYB_MAPPING = {
         "target": "right_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
             "position": 1.0,
@@ -850,7 +850,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "手首.L",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.05, 0.0, -0.05),
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
@@ -862,7 +862,7 @@ G1_MMD_YYB_MAPPING = {
         "source": "手首.R",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (-0.05, 0.0, -0.05),
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
@@ -874,24 +874,24 @@ G1_MMD_YYB_MAPPING = {
         "source": "手首.L",
         "target": "left_rubber_hand",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.05, 0.0, -0.05),
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
-            "position": 1.0,
-            "orientation": 1.0,
+            "position": 5.0,
+            "orientation": 0.5,
         },
     },
     "right_hand": {  # 23
         "source": "手首.R",
         "target": "right_rubber_hand",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (-0.05, 0.0, -0.05),
             "orientation": (0.707, 0.707, 0.0, 0.0),
         },
         "weight": {
-            "position": 1.0,
-            "orientation": 1.0,
+            "position": 5.0,
+            "orientation": 0.5,
         },
     },
 }

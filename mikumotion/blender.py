@@ -182,14 +182,14 @@ def build_body_motion_data(
                 continue
 
             # bone position is defined by the head
-            bone_position: Vector = source_bone.head
+            bone_position: Vector = source_bone.head.copy()
             # get the position offset in (x, y, z) in meters
             if entry.get("offset") and entry["offset"].get("position"):
                 bone_position += Vector(entry["offset"]["position"])
             motion._body_positions[frame, idx, :] = bone_position
 
             # get the rotation offset in (w, x, y, z) quaternion
-            bone_rotation: Quaternion = source_bone.matrix.to_quaternion()
+            bone_rotation: Quaternion = source_bone.matrix.to_quaternion().copy()
             if entry.get("offset") and entry["offset"].get("orientation"):
                 bone_rotation = Quaternion(quat_mul(bone_rotation, Quaternion(entry["offset"]["orientation"])))
             motion._body_rotations[frame, idx, :] = bone_rotation

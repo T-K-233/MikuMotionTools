@@ -44,9 +44,10 @@ from mikumotion.presets import G1_MMD_YYB_MAPPING
 from mikumotion.blender import (
     set_scene_animation_range,
     build_body_motion_data,
-    set_armature_to_rest,
     set_armature_to_pose,
 )
+from mikumotion.motion_sequence import rotate_motion
+
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
@@ -57,12 +58,13 @@ set_scene_animation_range(motion_section[0], motion_section[1])
 
 source_armature = D.objects.get("YYB式初音ミクv1.02_arm")
 
-# set_armature_to_rest(source_armature)
 set_armature_to_pose(source_armature)
 
-scaling_ratio = 0.9
-
+scaling_ratio = 0.85
 motion = build_body_motion_data(source_armature, mapping=G1_MMD_YYB_MAPPING, scaling_ratio=scaling_ratio)
+
+# blender is +Y forward, we need to rotate to +X forward
+motion = rotate_motion(motion, np.pi / 2)
 
 save_path = f"./data/motions/g1_zamuza_{motion_section[0]}_{motion_section[1]}_body_only.npz"
 motion.save(save_path)
