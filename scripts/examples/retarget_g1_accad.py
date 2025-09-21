@@ -66,3 +66,5 @@ motion = build_body_motion_data(source_armature, mapping=GenericKeypointMapping.
 save_path = f"./data/motions/accad_{motion_section[0]}_{motion_section[1]}_body_only.npz"
 motion.save(save_path)
 print(f"Results saved to {save_path}")
+
+exit()

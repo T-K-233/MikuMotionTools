@@ -1,13 +1,13 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/extract_g1_zamuza.py
+blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/retarget_g1_zamuza.py
 uv run ./scripts/compute_dof_ik.py --motion ./data/motions/g1_zamuza_0_1632.npz --mapping G1_MMD_YYB_MAPPING
 ```
 
 Windows:
 ```powershell
-D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\extract_g1_zamuza.py
+D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\retarget_g1_zamuza.py
 uv run ./scripts/compute_dof_ik.py --motion ./data/motions/g1_zamuza_0_1632.npz --mapping G1_MMD_YYB_MAPPING
 ```
 """
@@ -67,3 +67,5 @@ motion = build_body_motion_data(source_armature, mapping=G1_MMD_YYB_MAPPING, sca
 save_path = f"./data/motions/g1_zamuza_{motion_section[0]}_{motion_section[1]}_body_only.npz"
 motion.save(save_path)
 print(f"Results saved to {save_path}")
+
+exit()
