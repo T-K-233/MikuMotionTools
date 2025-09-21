@@ -1,12 +1,12 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/G1_USD.blend --python ./scripts/examples/export_g1_usd_frames.py
+blender ./blender-projects/G1_USD.blend --python ./scripts/examples/export_g1_reset_pose.py
 ```
 
 Windows:
 ```powershell
-D:\Documents\Blender\blender.exe .\blender-projects\G1_USD.blend --python scripts\examples\export_g1_usd_frames.py
+D:\Documents\Blender\blender.exe .\blender-projects\G1_USD.blend --python scripts\examples\export_g1_reset_pose.py
 ```
 """
 
@@ -49,6 +49,8 @@ usd_object = D.objects.get("g1_29dof_mode_6")
 
 g1_frames = []
 for value in G1_MMD_YYB_MAPPING.values():
+    if not value["target"]:
+        continue
     g1_frames.append(value["target"])
 
 motion_sequence = MotionSequence(
