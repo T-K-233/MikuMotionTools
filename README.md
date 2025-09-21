@@ -43,7 +43,7 @@ uv pip install -e .
 
 `data/robots/` stores the robot asset file used during inverse kinematic solving.
 
-Note: Due to licensing issue, the Blender project files and MMD motions should be retrieved from the original authors. For internal developers, the mirror of this directory is stored at [Google Drive]().
+Note: Due to licensing restrictions, the Blender project files and MMD motions cannot be redistributed here. To access them, please obtain the files directly from their original creators. For your convenience, we’ve included links to the original authors’ MMD motions in [this note](./data/motions/MMD-Motion-Sources.md). For internal developers, the mirror of this directory is stored at [Google Drive](https://drive.google.com/drive/folders/1sFQmo_UvkY5xSIZKLjXLxlAOpLdI_1jz?usp=drive_link).
 
 
 ## Motion Format
