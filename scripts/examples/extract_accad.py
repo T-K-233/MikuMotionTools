@@ -1,7 +1,7 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/ACCAD_Female1_B03_Walk1.blend --python ./scripts/examples/extract_accad.py
+blender ./blender-projects/ACCAD_Female1_WalkTurnChangeDirection.blend --python ./scripts/examples/extract_accad.py
 ```
 
 Windows:
@@ -50,11 +50,11 @@ from mikumotion.math import quat_mul, quat_from_euler_xyz
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
-motion_section = (0, 460)
+motion_section = (1, 652)
 
 set_scene_animation_range(motion_section[0], motion_section[1])
 
-source_armature = D.objects.get("Female1_B03_Walk1")
+source_armature = D.objects.get("armature")
 
 # set_armature_to_rest(source_armature)
 set_armature_to_pose(source_armature)
