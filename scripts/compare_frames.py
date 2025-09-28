@@ -43,6 +43,7 @@ if __name__ == "__main__":
 
     if args.mapping:
         mapping = PRESETS.get(args.mapping)
+        assert mapping, f"Mapping config {args.mapping} not found"
     else:
         mapping = None
         print("No mapping config provided, showing the default transformation.")

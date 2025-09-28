@@ -27,7 +27,7 @@ ACCAD_TO_G1_CFG = {
         "target": "pelvis",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (0.609, 0.359, 0.359, -0.609),
+            "orientation": (0.612, 0.354, 0.354, -0.612),
         },
         "weight": {
             "position": 10.0,
@@ -38,8 +38,8 @@ ACCAD_TO_G1_CFG = {
         "source": "LeftUpLeg",
         "target": "left_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -50,8 +50,8 @@ ACCAD_TO_G1_CFG = {
         "source": "RightUpLeg",
         "target": "right_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -74,8 +74,8 @@ ACCAD_TO_G1_CFG = {
         "source": "LeftLeg",
         "target": "left_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -86,8 +86,8 @@ ACCAD_TO_G1_CFG = {
         "source": "RightLeg",
         "target": "right_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -110,7 +110,7 @@ ACCAD_TO_G1_CFG = {
         "source": "LeftFoot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
             "orientation": (0.123, 0.696, 0.696, -0.123),
         },
         "weight": {
@@ -122,7 +122,7 @@ ACCAD_TO_G1_CFG = {
         "source": "RightFoot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
             "orientation": (0.123, 0.696, 0.696, -0.123),
         },
         "weight": {
@@ -146,7 +146,7 @@ ACCAD_TO_G1_CFG = {
         "source": "LeftToeBase",
         "target": "left_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
             "orientation": (0.062, -0.704, -0.704, -0.062),
         },
         "weight": {
@@ -158,7 +158,7 @@ ACCAD_TO_G1_CFG = {
         "source": "RightToeBase",
         "target": "right_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
             "orientation": (0.062, -0.704, -0.704, -0.062),
         },
         "weight": {
@@ -183,7 +183,7 @@ ACCAD_TO_G1_CFG = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, -0.707, 0.0),
         },
         "weight": {
             "position": 0.0,
@@ -195,7 +195,7 @@ ACCAD_TO_G1_CFG = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.0, 0.707, 0.0, 0.707),
         },
         "weight": {
             "position": 0.0,
@@ -219,7 +219,7 @@ ACCAD_TO_G1_CFG = {
         "target": "left_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, -0.707, 0.0),
         },
         "weight": {
             "position": 1.0,
@@ -231,7 +231,7 @@ ACCAD_TO_G1_CFG = {
         "target": "right_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.0, 0.707, 0.0, 0.707),
         },
         "weight": {
             "position": 1.0,
@@ -239,7 +239,7 @@ ACCAD_TO_G1_CFG = {
         },
     },
     "left_elbow": {  # 18
-        "source": "LeftForeArm",
+        "source": "",
         "target": "left_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -251,7 +251,7 @@ ACCAD_TO_G1_CFG = {
         },
     },
     "right_elbow": {  # 19
-        "source": "RightForeArm",
+        "source": "",
         "target": "right_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -1313,6 +1313,7 @@ MESHCAPADE_TO_G1_CFG = {
 }
 
 PRESETS = {
+    "ACCAD_TO_G1_CFG": ACCAD_TO_G1_CFG,
     "ACTORCORE_TO_G1_CFG": ACTORCORE_TO_G1_CFG,
     "MMD_YYB_TO_G1_CFG": MMD_YYB_TO_G1_CFG,
     "MESHCAPADE_TO_G1_CFG": MESHCAPADE_TO_G1_CFG,

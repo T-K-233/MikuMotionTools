@@ -18,6 +18,8 @@ if __name__ == "__main__":
     assert mapping_table, f"Mapping config {args.mapping} not found"
 
     match args.mapping:
+        case "ACCAD_TO_G1_CFG":
+            robot_xml = "./data/robots/unitree/g1/mjcf/g1_29dof_mode_5.xml"
         case "ACTORCORE_TO_G1_CFG":
             robot_xml = "./data/robots/unitree/g1/mjcf/g1_29dof_mode_5.xml"
         case "MMD_YYB_TO_G1_CFG":
