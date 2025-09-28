@@ -18,7 +18,7 @@ import numpy as np
 from mikumotion.math import quat_mul
 from mikumotion.mujoco_utils import create_empty_scene, add_body_frames
 from mikumotion.motion_sequence import MotionSequence
-from mikumotion.presets import MMD_YYB_TO_G1_CFG
+from mikumotion.presets import PRESETS
 
 
 if __name__ == "__main__":
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     data = mujoco.MjData(model)
 
     if args.mapping:
-        mapping = MMD_YYB_TO_G1_CFG
+        mapping = PRESETS.get(args.mapping)
     else:
         mapping = None
 
