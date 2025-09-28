@@ -1,12 +1,12 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/export_mmd_reset_pose.py
+blender ./blender-projects/Zamuza.blend --python ./scripts/examples/export_mmd_g1_reset_pose.py
 ```
 
 Windows:
 ```powershell
-D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\export_mmd_reset_pose.py
+D:\Documents\Blender\blender.exe .\blender-projects\Zamuza.blend --python scripts\examples\export_mmd_g1_reset_pose.py
 ```
 """
 
@@ -38,7 +38,7 @@ O = bpy.ops
 """ Everything else follows """
 
 import numpy as np
-from mikumotion.presets import G1_MMD_YYB_MAPPING
+from mikumotion.presets import MMD_YYB_TO_G1_CFG
 from mikumotion.blender import set_armature_to_rest, set_scene_animation_range, build_body_motion_data
 from mikumotion.motion_sequence import rotate_motion
 
@@ -52,13 +52,12 @@ set_armature_to_rest(armature)
 
 set_scene_animation_range(0, 1)
 
-scaling_ratio = 0.85
-motion = build_body_motion_data(armature, mapping=G1_MMD_YYB_MAPPING, scaling_ratio=scaling_ratio)
+motion = build_body_motion_data(armature, config=MMD_YYB_TO_G1_CFG)
 
 # blender is +Y forward, we need to rotate to +X forward
 motion = rotate_motion(motion, np.pi / 2)
 
-save_path = "./data/motions/mmd_reset_pose.npz"
+save_path = "./data/motions/mmd_g1_reset_pose.npz"
 motion.save(save_path)
 print(f"Results saved to {save_path}")
 exit()

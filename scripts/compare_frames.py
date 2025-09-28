@@ -9,6 +9,8 @@ uv run ./scripts/compare_frames.py
 ```
 """
 
+import argparse
+
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -17,14 +19,16 @@ from mikumotion.mujoco_utils import create_empty_scene, add_body_frames
 from mikumotion.motion_sequence import MotionSequence, translate_motion
 
 
-def main():
-    """
-    Main function to create and display the empty scene with coordinate frames.
-    """
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", type=str, required=True, help="Source motion file")
+    parser.add_argument("--target", type=str, required=True, help="Target motion file")
+    args = parser.parse_args()
+
     xml = create_empty_scene(show_world_frame=True)
 
-    source_armature = MotionSequence.load("./data/motions/mmd_reset_pose.npz")
-    target_armature = MotionSequence.load("./data/motions/g1_reset_pose.npz")
+    source_armature = MotionSequence.load(args.source)
+    target_armature = MotionSequence.load(args.target)
     # move G1 armature to stand on the ground
     target_armature = translate_motion(target_armature, np.array([0.0, 0.0, 0.78]))
 
@@ -50,7 +54,3 @@ def main():
             # Step the simulation (even though it's static)
             mujoco.mj_step(model, data)
             viewer.sync()
-
-
-if __name__ == "__main__":
-    main()

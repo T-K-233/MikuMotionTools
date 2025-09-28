@@ -114,8 +114,7 @@ def set_bones_to_1d_rotation(armature: Object) -> None:
 
 def build_body_motion_data(
     armature: Object,
-    mapping: dict[str, dict[str, str | dict]],
-    scaling_ratio: float = 1.0,
+    config: dict[str, dict[str, dict[str, str | dict]]],
 ) -> MotionSequence:
     """
     Build rigid body motion data from the source armature.
@@ -124,8 +123,7 @@ def build_body_motion_data(
 
     Args:
         armature: The source armature object.
-        mapping: The mapping from source armature bone names to target rigid body names.
-        scaling_ratio: The scaling ratio of the armature.
+        config: The mapping config from source armature bone names to target rigid body names.
 
     Returns:
         A MotionSequence object containing the motion data.
@@ -138,6 +136,9 @@ def build_body_motion_data(
 
     # mapped bodies
     body_names = []
+
+    scaling_ratio = config["scale"]
+    mapping = config["mapping"]
 
     for key, value in mapping.items():
         if not value.get("source") or not value.get("target"):

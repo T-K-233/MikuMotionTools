@@ -39,6 +39,19 @@ The general workflow of retargeting is listed as follows:
 4. Use [compute_dof_ik.py](./scripts/compute_dof_ik.py) to perform IK solving and get the joint positions. This script will also move the body frames to the solved FK positions.
 
 
+### Adding new mappings of motions or robots
+
+To retarget new motions or robots, a new retarget table needs to be added.
+
+When creating the table, the position and orientation offset between the source armature and the target armature needs to be identified. We have included a script to make the process a bit easier.
+
+1. Create and run script similar to `./scripts/export_g1_reset_pose.py` to get the reset pose of the target robot armature.
+
+2. Create and run script similar to `./scripts/export_mmd_reset_pose.py` to get the reset pose of the source armature.
+
+3. Run `./scripts/compare_frames.py --source <source-armature.npy> --target <target-armature.npy>` to visualize both frames. Adjust the mapping table to make the key points of the two armatures align.
+
+
 ## Running examples
 
 Export motion from Blender.

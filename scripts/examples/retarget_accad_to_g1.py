@@ -1,12 +1,12 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/ACCAD_Female1_WalkTurnChangeDirection.blend --python ./scripts/examples/extract_accad.py
+blender ./blender-projects/ACCAD_Female1_WalkTurnChangeDirection.blend --python ./scripts/examples/retarget_g1_accad.py
 ```
 
 Windows:
 ```powershell
-D:\Documents\Blender\blender.exe .\blender-projects\ACCAD_Female1_B03_Walk1.blend --python scripts\examples\extract_accad.py
+D:\Documents\Blender\blender.exe .\blender-projects\ACCAD_Female1_B03_Walk1.blend --python scripts\examples\retarget_g1_accad.py
 ```
 """
 
@@ -38,11 +38,10 @@ O = bpy.ops
 """ Everything else follows """
 
 import numpy as np
-from mikumotion.presets import GenericKeypointMapping
+from mikumotion.presets import G1_ACCAD_MAPPING
 from mikumotion.blender import (
     set_scene_animation_range,
     build_body_motion_data,
-    set_armature_to_rest,
     set_armature_to_pose,
 )
 from mikumotion.math import quat_mul, quat_from_euler_xyz
@@ -61,7 +60,7 @@ set_armature_to_pose(source_armature)
 
 scaling_ratio = 1.0
 
-motion = build_body_motion_data(source_armature, mapping=GenericKeypointMapping.accad, scaling_ratio=scaling_ratio)
+motion = build_body_motion_data(source_armature, mapping=G1_ACCAD_MAPPING, scaling_ratio=scaling_ratio)
 
 save_path = f"./data/motions/accad_{motion_section[0]}_{motion_section[1]}_body_only.npz"
 motion.save(save_path)

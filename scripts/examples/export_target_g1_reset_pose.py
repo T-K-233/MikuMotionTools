@@ -1,12 +1,12 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/G1_USD.blend --python ./scripts/examples/export_g1_reset_pose.py
+blender ./blender-projects/G1-USD.blend --python ./scripts/examples/export_g1_reset_pose.py
 ```
 
 Windows:
 ```powershell
-D:\Documents\Blender\blender.exe .\blender-projects\G1_USD.blend --python scripts\examples\export_g1_reset_pose.py
+D:\Documents\Blender\blender.exe .\blender-projects\G1-USD.blend --python scripts\examples\export_g1_reset_pose.py
 ```
 """
 
@@ -45,7 +45,7 @@ C = bpy.context
 D = bpy.data
 O = bpy.ops
 
-usd_object = D.objects.get("g1_29dof_mode_6")
+usd_object = D.objects.get("g1_29dof_mode_5")
 
 g1_frames = []
 for value in G1_MMD_YYB_MAPPING.values():
@@ -67,7 +67,7 @@ for frame in usd_object.children:
         motion_sequence.body_positions[0, motion_index] = frame.location
         motion_sequence.body_rotations[0, motion_index] = frame.rotation_quaternion
 
-motion_sequence.save(f"./data/motions/g1_reset_pose.npz")
-print(f"Results saved to ./data/motions/g1_reset_pose.npz")
+motion_sequence.save("./data/motions/g1_reset_pose.npz")
+print("Results saved to ./data/motions/g1_reset_pose.npz")
 
 exit()
