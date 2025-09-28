@@ -5,31 +5,60 @@ MikuMotionTools contains various functions for converting MMD (MikuMikuDance) mo
 
 ## Getting Started
 
-### Create the environment
+First, clone the repository from Github
+
+```bash
+git clone https://github.com/T-K-233/MikuMotionTools.git
+cd ./MikuMotionTools/
+uv pip install -e .
+```
+
+and install the dependencies
 
 ```bash
 uv sync
 ```
 
-To run the examples, do
+To install extra dependencies that is required by the example code, do
 
 ```bash
-uv pip install -e .
+uv sync --extra examples
 ```
 
-### Install the library
 
-From pip (coming soon)
+## General Workflow
+
+The general workflow of retargeting is listed as follows:
+
+1. Create a Blender project and import the source motion.
+
+2. Create a keypoint map between the source motion and target motion. Some examples are in [presets.py](./mikumotion/presets.py).
+
+3. Create a Python script to read the key frame position from the Blender project, and perform body retargeting. This will extract all the keypoint body positions and rotations, perform the remapping translation and rotation, and finally also calculate the body linear and rotation velocities.
+
+4. Use [compute_dof_ik.py](./scripts/compute_dof_ik.py) to perform IK solving and get the joint positions. This script will also move the body frames to the solved FK positions.
+
+
+## Running examples
+
+Export motion from Blender.
+
+This script only exports the body pose data. The joint data will be empty, and need to be filled in with the following retargeting script.
 
 ```bash
-uv pip install mikumotion
+blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/retarget_g1_zamuza.py
 ```
 
-From source
+View motion with matplotlib:
+
 ```bash
-git clone https://github.com/T-K-233/MikuMotionTools.git
-cd ./MikuMotionTools/
-uv pip install -e .
+uv run ./scripts/view_motion.py --motion ./data/motions/g1_zamuza_0_1632.npz
+```
+
+Run retargeting logic to solve for joint data.
+
+```bash
+uv run ./scripts/examples/retarget_g1.py --motion ./data/motions/g1_zamuza_0_1632.npz --robot unitree_g1 --realtime
 ```
 
 
@@ -65,6 +94,38 @@ Each motion file is a numpy dictionary with the following fields. Here, we assum
 The converted motion file is targeted for one particular robot skeleton structure. 
 
 To ensure best performance, also make sure that the frame rate matches the training environment policy update rate to avoid expensive interpolations.
+
+
+### Generic Joint Names
+
+We follow the [SMPL-X joint name](https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18) as a generic joint naming convention.
+
+```
+    "pelvis",
+    "left_hip",
+    "right_hip",
+    "spine1",
+    "left_knee",
+    "right_knee",
+    "spine2",
+    "left_ankle",
+    "right_ankle",
+    "spine3",
+    "left_foot",
+    "right_foot",
+    "neck",
+    "left_collar",
+    "right_collar",
+    "head",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hand",
+    "right_hand",
+```
 
 
 ## Working with MMD

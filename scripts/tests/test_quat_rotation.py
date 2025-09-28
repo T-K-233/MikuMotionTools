@@ -13,6 +13,7 @@ def test(name, golden, actual):
         print(f"Test <{name}> failed: {golden} != {actual}")
         # raise AssertionError(f"{golden} != {actual}")
 
+
 test("X=  0,  Y=  0, Z=  0", quat_from_euler_xyz(0, 0, 0), np.array([1, 0, 0, 0]))
 
 test("X= 30,  Y=  0, Z=  0", quat_from_euler_xyz(rad_30, 0, 0), np.array([0.966, 0.259, 0, 0]))

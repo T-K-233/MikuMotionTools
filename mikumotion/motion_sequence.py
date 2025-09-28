@@ -50,7 +50,7 @@ class MotionSequence:
 
     def __init__(self, num_frames: int, dof_names: list[str], body_names: list[str], fps: int = 50) -> None:
         """Initialize a MotionSequence object.
-        
+
         Args:
             num_frames: Number of frames.
             dof_names: List of joint names.
@@ -150,7 +150,7 @@ class MotionSequence:
         """Rigid body angular velocities."""
         return self._body_angular_velocities
 
-    def get_dof_index(self, dof_names: list[str]) -> list[int]:
+    def get_dof_indices(self, dof_names: list[str]) -> list[int]:
         """Get joint indexes by joint names.
 
         Args:
@@ -168,7 +168,7 @@ class MotionSequence:
             indexes.append(self._dof_names.index(name))
         return indexes
 
-    def get_body_index(self, body_names: list[str]) -> list[int]:
+    def get_body_indices(self, body_names: list[str]) -> list[int]:
         """Get rigid body indexes by rigid body names.
 
         Args:
@@ -215,7 +215,7 @@ class MotionSequence:
 
     def save(self, path: str) -> None:
         """Save the motion data to a file.
-        
+
         Args:
             path: The path to the output file.
         """
@@ -234,6 +234,125 @@ class MotionSequence:
             body_linear_velocities=self._body_linear_velocities,
             body_angular_velocities=self._body_angular_velocities,
         )
+
+
+def rotate_motion(motion: MotionSequence, z_rotation: float) -> MotionSequence:
+    """
+    Rotate the motion data by a z-rotation amount.
+
+    Args:
+        motion: The motion sequence to rotate
+        z_rotation: Rotation angle around Z-axis in radians
+
+    Returns:
+        A new MotionSequence with rotated data
+    """
+    from mikumotion.math import quat_mul, quat_from_euler_zyx
+
+    # Create a new motion sequence with the same structure
+    rotated_motion = MotionSequence(
+        num_frames=motion.num_frames,
+        dof_names=motion.dof_names,
+        body_names=motion.body_names,
+        fps=motion.fps
+    )
+
+    # Copy DOF data (joint angles don't need rotation)
+    rotated_motion._dof_positions[:] = motion._dof_positions
+    rotated_motion._dof_velocities[:] = motion._dof_velocities
+
+    # Create rotation quaternion for z-rotation
+    # Using ZYX convention: roll=0, pitch=0, yaw=z_rotation
+    rotation_quat = quat_from_euler_zyx(
+        np.array([0.0]),  # roll
+        np.array([0.0]),  # pitch
+        np.array([z_rotation])  # yaw
+    )[0]  # Extract single quaternion from array
+
+    # Rotate body positions
+    for frame_idx in range(motion.num_frames):
+        for body_idx in range(len(motion.body_names)):
+            # Convert position to homogeneous coordinates
+            pos = motion._body_positions[frame_idx, body_idx]
+
+            # Rotate position using quaternion
+            # For position rotation: new_pos = q * pos * q_conjugate
+            # But we can use a simpler approach with rotation matrix
+            # Convert quaternion to rotation matrix and apply
+            w, x, y, z = rotation_quat
+
+            # Rotation matrix from quaternion
+            R = np.array([
+                [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
+                [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
+            ])
+
+            rotated_motion._body_positions[frame_idx, body_idx] = R @ pos
+
+    # Rotate body rotations (quaternions)
+    for frame_idx in range(motion.num_frames):
+        for body_idx in range(len(motion.body_names)):
+            # Get current body rotation
+            current_quat = motion._body_rotations[frame_idx, body_idx]
+
+            # Rotate quaternion: new_quat = rotation_quat * current_quat
+            rotated_quat = quat_mul(rotation_quat, current_quat)
+            rotated_motion._body_rotations[frame_idx, body_idx] = rotated_quat
+
+    # Rotate body linear velocities
+    for frame_idx in range(motion.num_frames):
+        for body_idx in range(len(motion.body_names)):
+            # Get current linear velocity
+            linear_vel = motion._body_linear_velocities[frame_idx, body_idx]
+
+            # Rotate linear velocity using the same rotation matrix
+            w, x, y, z = rotation_quat
+            R = np.array([
+                [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
+                [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
+            ])
+
+            rotated_motion._body_linear_velocities[frame_idx, body_idx] = R @ linear_vel
+
+    # Rotate body angular velocities
+    for frame_idx in range(motion.num_frames):
+        for body_idx in range(len(motion.body_names)):
+            # Get current angular velocity
+            angular_vel = motion._body_angular_velocities[frame_idx, body_idx]
+
+            # Rotate angular velocity using the same rotation matrix
+            w, x, y, z = rotation_quat
+            R = np.array([
+                [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
+                [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+                [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
+            ])
+
+            rotated_motion._body_angular_velocities[frame_idx, body_idx] = R @ angular_vel
+
+    return rotated_motion
+
+
+def translate_motion(motion: MotionSequence, translation: np.ndarray) -> MotionSequence:
+    """
+    Translate the motion data by a translation amount.
+    """
+    translated_motion = MotionSequence(
+        num_frames=motion.num_frames,
+        dof_names=motion.dof_names,
+        body_names=motion.body_names,
+        fps=motion.fps
+    )
+    translated_motion._dof_positions = motion._dof_positions
+    translated_motion._dof_velocities = motion._dof_velocities
+    translated_motion._dof_velocities = motion._dof_velocities
+    translated_motion._body_positions = motion._body_positions + translation
+    translated_motion._body_rotations = motion._body_rotations
+    translated_motion._body_linear_velocities = motion._body_linear_velocities
+    translated_motion._body_angular_velocities = motion._body_angular_velocities
+    return translated_motion
 
 
 if __name__ == "__main__":

@@ -2,10 +2,11 @@ from typing import Callable
 
 import numpy as np
 import bpy
-import bpy_types
-from mathutils import Vector
+from bpy_types import Object, PoseBone
+from mathutils import Vector, Quaternion
 
 from .motion_sequence import MotionSequence
+from .math import quat_mul
 
 
 C = bpy.context
@@ -72,21 +73,21 @@ def set_scene_animation_range(start: int, end: int) -> None:
     C.scene.frame_end = end
 
 
-def set_armature_to_rest(armature: bpy_types.Object) -> None:
+def set_armature_to_rest(armature: Object) -> None:
     """
     Set the armature to rest pose.
     """
     armature.data.pose_position = "REST"
 
 
-def set_armature_to_pose(armature: bpy_types.Object) -> None:
+def set_armature_to_pose(armature: Object) -> None:
     """
     Set the armature to animation pose.
     """
     armature.data.pose_position = "POSE"
 
 
-def set_bones_to_1d_rotation(armature: bpy_types.Object) -> None:
+def set_bones_to_1d_rotation(armature: Object) -> None:
     """
     Set the bones to 1D rotation mode, and allow only Y-axis rotation (along the bone axis).
     Use this function to convert arbitrary armature to "realistic" robot armature with revolute joints.
@@ -112,13 +113,13 @@ def set_bones_to_1d_rotation(armature: bpy_types.Object) -> None:
 
 
 def build_body_motion_data(
-    armature: bpy_types.Object,
-    mapping: dict[str, tuple[str, Callable]],
+    armature: Object,
+    mapping: dict[str, dict[str, str | dict]],
     scaling_ratio: float = 1.0,
 ) -> MotionSequence:
     """
     Build rigid body motion data from the source armature.
-    The dof motion data is not included in this function, which will be initialized 
+    The dof motion data is not included in this function, which will be initialized
     as a properly-dimensioned zero array.
 
     Args:
@@ -135,19 +136,27 @@ def build_body_motion_data(
 
     assert end_frame >= start_frame, f"Frame range is invalid: {start_frame} to {end_frame}"
 
-    link_names = list(mapping.keys())
+    # mapped bodies
+    body_names = []
+
+    for key, value in mapping.items():
+        if not value.get("source") or not value.get("target"):
+            # skip the body that is not mapped
+            print(f"INFO: body {key} is not mapped, skipping...")
+            continue
+        body_names.append(key)
 
     n_frames = end_frame - start_frame + 1
 
     motion = MotionSequence(
         num_frames=n_frames,
         dof_names=[],
-        body_names=link_names,
+        body_names=body_names,
         fps=fps_float,
     )
 
     # used to calculate angular velocities
-    body_rotations_euler = np.zeros((n_frames, len(link_names), 3), dtype=np.float32)
+    body_rotations_euler = np.zeros((n_frames, len(body_names), 3), dtype=np.float32)
 
     # === extract motion data ===
     for frame in range(n_frames):
@@ -159,24 +168,33 @@ def build_body_motion_data(
         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
 
         # read bone positions
-        for idx, name in enumerate(link_names):
+        for idx, name in enumerate(body_names):
             entry = mapping.get(name)
             if not entry:
                 print(f"WARNING: cannot find link mapping for {name}")
                 continue
 
-            source_bone_name, mapping_function = entry
+            source_bone_name: str = entry.get("source")
 
-            source_bone = armature.pose.bones.get(source_bone_name)
+            source_bone: PoseBone = armature.pose.bones.get(source_bone_name)
             if not source_bone:
                 print(f"WARNING: cannot find source bone {source_bone_name}")
                 continue
 
-            motion._body_positions[frame, idx, :] = mapping_function(source_bone)
+            # bone position is defined by the head
+            bone_position: Vector = source_bone.head.copy()
+            # get the position offset in (x, y, z) in meters
+            if entry.get("offset") and entry["offset"].get("position"):
+                bone_position += Vector(entry["offset"]["position"])
+            motion._body_positions[frame, idx, :] = bone_position
 
-            matrix = source_bone.matrix
-            motion._body_rotations[frame, idx, :] = matrix.to_quaternion()
-            body_rotations_euler[frame, idx, :] = matrix.to_euler()
+            # get the rotation offset in (w, x, y, z) quaternion
+            bone_rotation: Quaternion = source_bone.matrix.to_quaternion().copy()
+            if entry.get("offset") and entry["offset"].get("orientation"):
+                bone_rotation = Quaternion(quat_mul(bone_rotation, Quaternion(entry["offset"]["orientation"])))
+            motion._body_rotations[frame, idx, :] = bone_rotation
+
+            body_rotations_euler[frame, idx, :] = bone_rotation.to_euler()
 
         print(f"Processing: #{frame}/{n_frames} ({frame / n_frames * 100:.2f}%)", end="\r")
 
@@ -552,7 +570,7 @@ def bind_to_armature(skeleton_tree: dict):
         frame.matrix_world = matrix_world.copy()
 
 
-def load_replay(skeleton_tree: dict, armature: bpy_types.Object, data_path: str):
+def load_replay(skeleton_tree: dict, armature: Object, data_path: str):
     # TODO: refactor the replay motion format to use the same format as the motion data
     data = np.load(data_path)
 

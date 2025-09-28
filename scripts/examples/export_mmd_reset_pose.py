@@ -1,0 +1,64 @@
+"""
+Ubuntu:
+```bash
+blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/export_mmd_reset_pose.py
+```
+
+Windows:
+```powershell
+D:\Documents\Blender\blender.exe .\blender-projects\G1_Zamuza.blend --python scripts\examples\export_mmd_reset_pose.py
+```
+"""
+
+import sys
+import os
+import bpy
+import importlib
+
+""" Include the pose library """
+
+blend_path = os.path.dirname(bpy.data.filepath)
+mikumotion_path = os.getcwd()
+
+if blend_path not in sys.path:
+   sys.path.append(blend_path)
+
+if mikumotion_path not in sys.path:
+   sys.path.append(mikumotion_path)
+
+from mikumotion import blender
+
+importlib.reload(blender)
+
+C = bpy.context
+D = bpy.data
+O = bpy.ops
+
+
+""" Everything else follows """
+
+import numpy as np
+from mikumotion.presets import G1_MMD_YYB_MAPPING
+from mikumotion.blender import set_armature_to_rest, set_scene_animation_range, build_body_motion_data
+from mikumotion.motion_sequence import rotate_motion
+
+C = bpy.context
+D = bpy.data
+O = bpy.ops
+
+armature = D.objects.get("YYB式初音ミクv1.02_arm")
+
+set_armature_to_rest(armature)
+
+set_scene_animation_range(0, 1)
+
+scaling_ratio = 0.85
+motion = build_body_motion_data(armature, mapping=G1_MMD_YYB_MAPPING, scaling_ratio=scaling_ratio)
+
+# blender is +Y forward, we need to rotate to +X forward
+motion = rotate_motion(motion, np.pi / 2)
+
+save_path = "./data/motions/mmd_reset_pose.npz"
+motion.save(save_path)
+print(f"Results saved to {save_path}")
+exit()
