@@ -1,4 +1,9 @@
 """
+
+# Usage
+
+1. Export the motion from Blender:
+
 Ubuntu:
 ```bash
 blender ./blender-projects/ActorCore-Walk-Relaxed.blend --python ./scripts/examples/export_actorcore.py
@@ -7,6 +12,12 @@ blender ./blender-projects/ActorCore-Walk-Relaxed.blend --python ./scripts/examp
 Windows:
 ```powershell
 D:\Documents\Blender\blender.exe .\blender-projects\ActorCore-Walk-Relaxed.blend --python scripts\examples\export_actorcore.py
+```
+
+2. After getting the source motion, run the retargeting script:
+
+```bash
+uv run ./scripts/run_retargeting.py --motion ./data/motions/actorcore_walk_relaxed_0_293.npz --mapping ACTORCORE_TO_G1_CFG --real-time
 ```
 """
 
@@ -80,7 +91,7 @@ bone_names = [
    "CC_Base_R_Hand",       # 21, 23
 ]
 
-scaling_ratio = 0.85 * 0.01
+scaling_ratio = 0.7 * 0.01
 
 # blender is +Y forward, we need to rotate to +X forward
 rotate_z_angle = np.pi / 2

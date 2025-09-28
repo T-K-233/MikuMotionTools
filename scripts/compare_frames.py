@@ -45,6 +45,7 @@ if __name__ == "__main__":
         mapping = PRESETS.get(args.mapping)
     else:
         mapping = None
+        print("No mapping config provided, showing the default transformation.")
 
     # move the source frame mocap body
     for body_name in source_armature.body_names:

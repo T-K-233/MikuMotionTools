@@ -1,4 +1,9 @@
 """
+
+# Usage
+
+1. Export the motion from Blender:
+
 Ubuntu:
 ```bash
 blender ./blender-projects/Zamuza.blend --python ./scripts/examples/export_zamuza.py
@@ -7,6 +12,12 @@ blender ./blender-projects/Zamuza.blend --python ./scripts/examples/export_zamuz
 Windows:
 ```powershell
 D:\Documents\Blender\blender.exe .\blender-projects\Zamuza.blend --python scripts\examples\export_zamuza.py
+```
+
+2. After getting the source motion, run the retargeting script:
+
+```bash
+uv run ./scripts/run_retargeting.py --motion ./data/motions/zamuza_0_1632.npz --mapping MMD_YYB_TO_G1_CFG --real-time
 ```
 """
 

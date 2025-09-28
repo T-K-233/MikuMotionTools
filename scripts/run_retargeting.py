@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     motion_file = args.motion
 
-    mapping_table = PRESETS.get("ACTORCORE_TO_G1_CFG")
+    mapping_table = PRESETS.get(args.mapping)
 
     assert mapping_table, f"Mapping config {args.mapping} not found"
 

@@ -318,8 +318,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_Pelvis",
         "target": "pelvis",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.0, 0.05),
+            "orientation": (0.455, -0.542, -0.542, -0.455),  # X -100 deg, Z -90 deg
         },
         "weight": {
             "position": 10.0,
@@ -330,8 +330,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_L_Thigh",
         "target": "left_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, -0.08),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -342,8 +342,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_R_Thigh",
         "target": "right_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, -0.08),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -366,8 +366,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_L_Calf",
         "target": "left_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, -0.03),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -378,8 +378,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_R_Calf",
         "target": "right_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, -0.03),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -402,8 +402,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_L_Foot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, 0.0),
+            "orientation": (0.704, 0.062, -0.062, 0.704),  # X +10 deg, Z +90 deg
         },
         "weight": {
             "position": 0.0,
@@ -414,8 +414,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_R_Foot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, 0.0),
+            "orientation": (0.704, 0.062, -0.062, 0.704),  # X +10 deg, Z +90 deg
         },
         "weight": {
             "position": 0.0,
@@ -438,8 +438,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_L_ToeBaseShareBone",
         "target": "left_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, 0.0),
+            "orientation": (0.706, -0.031, 0.031, 0.706),  # X -5 deg, Z +90 deg
         },
         "weight": {
             "position": 1.0,
@@ -450,8 +450,8 @@ ACTORCORE_TO_G1_CFG = {
         "source": "CC_Base_R_ToeBaseShareBone",
         "target": "right_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, 0.0),
+            "orientation": (0.706, -0.031, 0.031, 0.706),  # X -5 deg, Z +90 deg
         },
         "weight": {
             "position": 1.0,
@@ -511,7 +511,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 0.0,
@@ -523,7 +523,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "right_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -535,7 +535,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "left_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -547,7 +547,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "right_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -559,7 +559,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 0.0,
@@ -571,7 +571,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 0.0,
@@ -583,7 +583,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "left_rubber_hand",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 1.0,
@@ -595,7 +595,7 @@ ACTORCORE_TO_G1_CFG = {
         "target": "right_rubber_hand",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 1.0,

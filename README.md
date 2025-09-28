@@ -36,7 +36,7 @@ The general workflow of retargeting is listed as follows:
 
 3. Create a keypoint mapping configuration between the source motion armature and target motion armature. Some examples are in [presets.py](./mikumotion/presets.py).
 
-4. Use [compute_dof_ik.py](./scripts/compute_dof_ik.py) to perform motion retargeting. This will first read from the source MotionSeuqence, perform the remapping translation, rotation, and scaling according to the mapping config, perform IK solving and get the joint positions, update the body pose and velocities according to the solved FK solutions, and write the result as a new MotionSequence file.
+4. Use [run_retargeting.py](./scripts/run_retargeting.py) to perform motion retargeting. This will first read from the source MotionSeuqence, perform the remapping translation, rotation, and scaling according to the mapping config, perform IK solving and get the joint positions, update the body pose and velocities according to the solved FK solutions, and write the result as a new MotionSequence file.
 
 
 ## Running examples
@@ -59,6 +59,16 @@ Run retargeting logic to solve for joint data.
 
 ```bash
 uv run ./scripts/run_retargeting.py --motion ./data/motions/zamuza_0_1632.npz --mapping MMD_YYB_TO_G1_CFG --real-time
+```
+
+When adding new mapping config, the following script might be helpful:
+
+```bash
+# export the reset pose of target robot
+blender ./blender-projects/G1-USD.blend --python ./scripts/examples/export_g1_reset_pose.py
+
+# compare the frames between source motion and target robot armature
+uv run ./scripts/compare_frames.py --source ./data/motions/actorcore_reset.npz --target ./data/motions/g1_reset_pose.npz --mapping ACTORCORE_TO_G1_CFG
 ```
 
 
