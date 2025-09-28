@@ -9,32 +9,50 @@ uv run ./scripts/compare_frames.py
 ```
 """
 
+import argparse
+
 import mujoco
 import mujoco.viewer
 import numpy as np
 
 from mikumotion.mujoco_utils import create_empty_scene, add_body_frames
-from mikumotion.motion_sequence import MotionSequence, translate_motion
+from mikumotion.motion_sequence import MotionSequence
 
 
-def main():
-    """
-    Main function to create and display the empty scene with coordinate frames.
-    """
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", type=str, required=True, help="Source motion file")
+    parser.add_argument("--target", type=str, required=True, help="Target motion file")
+    args = parser.parse_args()
+
     xml = create_empty_scene(show_world_frame=True)
 
-    source_armature = MotionSequence.load("./data/motions/mmd_reset_pose.npz")
-    target_armature = MotionSequence.load("./data/motions/g1_reset_pose.npz")
-    # move G1 armature to stand on the ground
-    target_armature = translate_motion(target_armature, np.array([0.0, 0.0, 0.78]))
+    source_armature = MotionSequence.load(args.source)
+    target_armature = MotionSequence.load(args.target)
 
     # Create the XML content
-    xml = add_body_frames(xml, source_armature, prefix="source_", center_color=(0.0, 1.0, 1.0))
-    xml = add_body_frames(xml, target_armature, prefix="target_", center_color=(1.0, 0.0, 1.0))
+    xml = add_body_frames(xml, source_armature.body_names, prefix="source_", center_color=(0.0, 1.0, 1.0))
+    xml = add_body_frames(xml, target_armature.body_names, prefix="target_", center_color=(1.0, 0.0, 1.0))
 
     # Load the model from XML string
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)
+
+    # move the source frame mocap body
+    for body_name in source_armature.body_names:
+        position = source_armature.body_positions[0, source_armature.get_body_indices([body_name])[0]]
+        orientation = source_armature.body_rotations[0, source_armature.get_body_indices([body_name])[0]]
+        mocap_id = model.body(f"source_{body_name}_frame").mocapid[0]
+        data.mocap_pos[mocap_id] = position
+        data.mocap_quat[mocap_id] = orientation
+
+    # move the target frame mocap body
+    for body_name in target_armature.body_names:
+        position = target_armature.body_positions[0, target_armature.get_body_indices([body_name])[0]]
+        orientation = target_armature.body_rotations[0, target_armature.get_body_indices([body_name])[0]]
+        mocap_id = model.body(f"target_{body_name}_frame").mocapid[0]
+        data.mocap_pos[mocap_id] = position
+        data.mocap_quat[mocap_id] = orientation
 
     # Launch the viewer
     with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -50,7 +68,3 @@ def main():
             # Step the simulation (even though it's static)
             mujoco.mj_step(model, data)
             viewer.sync()
-
-
-if __name__ == "__main__":
-    main()

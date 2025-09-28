@@ -46,19 +46,19 @@ Export motion from Blender.
 This script only exports the body pose data. The joint data will be empty, and need to be filled in with the following retargeting script.
 
 ```bash
-blender ./blender-projects/G1_Zamuza.blend --python ./scripts/examples/retarget_g1_zamuza.py
+blender ./blender-projects/Zamuza.blend --python ./scripts/examples/export_zamuza.py
 ```
 
 View motion with matplotlib:
 
 ```bash
-uv run ./scripts/view_motion.py --motion ./data/motions/g1_zamuza_0_1632.npz
+uv run ./scripts/view_motion.py --motion ./data/motions/zamuza_0_1632.npz
 ```
 
 Run retargeting logic to solve for joint data.
 
 ```bash
-uv run ./scripts/examples/retarget_g1.py --motion ./data/motions/g1_zamuza_0_1632.npz --robot unitree_g1 --realtime
+uv run ./scripts/run_retargeting.py --motion ./data/motions/zamuza_0_1632.npz --mapping MMD_YYB_TO_G1_CFG --real-time
 ```
 
 

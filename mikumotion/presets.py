@@ -21,7 +21,7 @@ and https://chingswy.github.io/easymocap-public-doc/database/2_keypoints.html#sm
 """
 
 
-G1_ACCAD_MAPPING = {
+ACCAD_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "Hips",
         "target": "pelvis",
@@ -313,7 +313,7 @@ G1_ACCAD_MAPPING = {
 }
 
 
-G1_ACTORCORE_MAPPING = {
+ACTORCORE_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "CC_Base_Pelvis",
         "target": "pelvis",
@@ -605,7 +605,7 @@ G1_ACTORCORE_MAPPING = {
 }
 
 
-G1_MMD_YYB_MAPPING = {
+MMD_YYB_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "下半身",
         "target": "pelvis",
@@ -897,7 +897,7 @@ G1_MMD_YYB_MAPPING = {
 }
 
 
-G1_MIXAMO_MAPPING = {
+MIXAMO_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "mixamorig:Hips",
         "target": "pelvis",
@@ -1081,7 +1081,7 @@ G1_MIXAMO_MAPPING = {
 }
 
 
-G1_MESHCAPADE_MAPPING = {
+MESHCAPADE_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "pelvis",
         "target": "pelvis",
