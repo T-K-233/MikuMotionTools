@@ -30,13 +30,13 @@ uv sync --extra examples
 
 The general workflow of retargeting is listed as follows:
 
-1. Create a Blender project and import the source motion.
+1. Create a Blender project and import the source motion. Adjust the animation in Blender to match the target policy frequency (typically 50 Hz).
 
-2. Create a keypoint map between the source motion and target motion. Some examples are in [presets.py](./mikumotion/presets.py).
+2. Create a Python script to read the key frame position and orientations of the source armature motion in the Blender project. This will generate a MotionSequence labeled with source motion bone names.
 
-3. Create a Python script to read the key frame position from the Blender project, and perform body retargeting. This will extract all the keypoint body positions and rotations, perform the remapping translation and rotation, and finally also calculate the body linear and rotation velocities.
+3. Create a keypoint mapping configuration between the source motion armature and target motion armature. Some examples are in [presets.py](./mikumotion/presets.py).
 
-4. Use [compute_dof_ik.py](./scripts/compute_dof_ik.py) to perform IK solving and get the joint positions. This script will also move the body frames to the solved FK positions.
+4. Use [compute_dof_ik.py](./scripts/compute_dof_ik.py) to perform motion retargeting. This will first read from the source MotionSeuqence, perform the remapping translation, rotation, and scaling according to the mapping config, perform IK solving and get the joint positions, update the body pose and velocities according to the solved FK solutions, and write the result as a new MotionSequence file.
 
 
 ## Running examples
