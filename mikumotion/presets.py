@@ -351,7 +351,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "spine1": {  # 3
-        "source": "CC_Base_Spine02",
+        "source": "CC_Base_Spine01",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -435,7 +435,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "left_foot": {  # 10
-        "source": "CC_Base_L_Foot",
+        "source": "CC_Base_L_ToeBaseShareBone",
         "target": "left_ankle_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -447,7 +447,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "right_foot": {  # 11
-        "source": "CC_Base_R_Foot",
+        "source": "CC_Base_R_ToeBaseShareBone",
         "target": "right_ankle_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -459,7 +459,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "neck": {  # 12
-        "source": "CC_Base_R_Foot",
+        "source": "CC_Base_NeckTwist02",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -483,7 +483,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "right_collar": {  # 14
-        "source": "CC_Base_L_Clavicle",
+        "source": "CC_Base_R_Clavicle",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -507,7 +507,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "left_shoulder": {  # 16
-        "source": "CC_Base_L_Clavicle",
+        "source": "CC_Base_L_Upperarm",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -519,7 +519,7 @@ ACTORCORE_TO_G1_CFG = {
         },
     },
     "right_shoulder": {  # 17
-        "source": "CC_Base_R_Clavicle",
+        "source": "CC_Base_R_Upperarm",
         "target": "right_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
