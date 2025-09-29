@@ -189,12 +189,12 @@ class MotionRetargeting:
                 # TODO: might be better to optimize the following logic with numpy vectorization
                 source_body_index = self.source_motion.get_body_indices([source_bone_name])[0]
 
-                source_position = self.source_motion.body_positions[frame_idx, source_body_index]
+                source_position = self.source_motion.body_positions[frame_idx, source_body_index].copy()
                 # get the position offset in (x, y, z) in meters
                 if mapping_entry.get("offset") and mapping_entry["offset"].get("position"):
                     source_position += np.array(mapping_entry["offset"]["position"])
 
-                source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index]
+                source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index].copy()
                 if mapping_entry.get("offset") and mapping_entry["offset"].get("orientation"):
                     source_orientation = quat_mul(source_orientation, np.array(mapping_entry["offset"]["orientation"]))
 
