@@ -114,7 +114,7 @@ def set_bones_to_1d_rotation(armature: Object) -> None:
 
 def build_body_motion_data(
     armature: Object,
-    mapping: dict[str, dict[str, str | dict]],
+    bone_names: list[str],
     scaling_ratio: float = 1.0,
 ) -> MotionSequence:
     """
@@ -124,7 +124,7 @@ def build_body_motion_data(
 
     Args:
         armature: The source armature object.
-        mapping: The mapping from source armature bone names to target rigid body names.
+        bone_names: The list of bone names to extract.
         scaling_ratio: The scaling ratio of the armature.
 
     Returns:
@@ -136,27 +136,17 @@ def build_body_motion_data(
 
     assert end_frame >= start_frame, f"Frame range is invalid: {start_frame} to {end_frame}"
 
-    # mapped bodies
-    body_names = []
-
-    for key, value in mapping.items():
-        if not value.get("source") or not value.get("target"):
-            # skip the body that is not mapped
-            print(f"INFO: body {key} is not mapped, skipping...")
-            continue
-        body_names.append(key)
-
     n_frames = end_frame - start_frame + 1
 
     motion = MotionSequence(
         num_frames=n_frames,
         dof_names=[],
-        body_names=body_names,
+        body_names=bone_names,
         fps=fps_float,
     )
 
     # used to calculate angular velocities
-    body_rotations_euler = np.zeros((n_frames, len(body_names), 3), dtype=np.float32)
+    body_rotations_euler = np.zeros((n_frames, len(motion.body_names), 3), dtype=np.float32)
 
     # === extract motion data ===
     for frame in range(n_frames):
@@ -168,30 +158,19 @@ def build_body_motion_data(
         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
 
         # read bone positions
-        for idx, name in enumerate(body_names):
-            entry = mapping.get(name)
-            if not entry:
-                print(f"WARNING: cannot find link mapping for {name}")
-                continue
+        for idx, bone_name in enumerate(motion.body_names):
 
-            source_bone_name: str = entry.get("source")
-
-            source_bone: PoseBone = armature.pose.bones.get(source_bone_name)
+            source_bone: PoseBone = armature.pose.bones.get(bone_name)
             if not source_bone:
-                print(f"WARNING: cannot find source bone {source_bone_name}")
+                print(f"WARNING: cannot find source bone {bone_name}")
                 continue
 
             # bone position is defined by the head
             bone_position: Vector = source_bone.head.copy()
-            # get the position offset in (x, y, z) in meters
-            if entry.get("offset") and entry["offset"].get("position"):
-                bone_position += Vector(entry["offset"]["position"])
             motion._body_positions[frame, idx, :] = bone_position
 
             # get the rotation offset in (w, x, y, z) quaternion
             bone_rotation: Quaternion = source_bone.matrix.to_quaternion().copy()
-            if entry.get("offset") and entry["offset"].get("orientation"):
-                bone_rotation = Quaternion(quat_mul(bone_rotation, Quaternion(entry["offset"]["orientation"])))
             motion._body_rotations[frame, idx, :] = bone_rotation
 
             body_rotations_euler[frame, idx, :] = bone_rotation.to_euler()

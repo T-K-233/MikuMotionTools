@@ -58,14 +58,14 @@ class MotionRetargeting:
         self,
         motion_file: str,
         robot_xml: str,
-        mapping_table: dict,
+        config: dict,
         solver: str = "daqp",
         damping: float = 0.5,
         max_iter: int = 20,
     ):
         self.motion_file = motion_file
         self.robot_xml = robot_xml
-        self.mapping_table = mapping_table
+        self.mapping_table = config
         self.solver = solver
         self.damping = damping
         self.max_iter = max_iter
@@ -75,10 +75,18 @@ class MotionRetargeting:
         self.num_frames = self.source_motion.num_frames
         self.fps = self.source_motion.fps[0]
 
+        self.retargeted_bodies = []
+        target_bone_names = []
+        for body_name, entry in config.items():
+            if not entry["source"] or not entry["target"]:
+                continue
+            self.retargeted_bodies.append(body_name)
+            target_bone_names.append(entry["target"])
+
         # add coordinate frames to the robot XML
         xml = open(self.robot_xml).read()
-        xml = add_body_frames(xml, self.source_motion, prefix="current_", center_color=(0.0, 1.0, 1.0))
-        xml = add_body_frames(xml, self.source_motion, prefix="target_", center_color=(1.0, 0.0, 1.0))
+        xml = add_body_frames(xml, self.retargeted_bodies, prefix="current_", center_color=(0.0, 1.0, 1.0))
+        xml = add_body_frames(xml, self.retargeted_bodies, prefix="target_", center_color=(1.0, 0.0, 1.0))
         open(self.robot_xml.replace(".xml", "_frames.xml"), "w").write(xml)
 
         model = mujoco.MjModel.from_xml_path(self.robot_xml.replace(".xml", "_frames.xml"))
@@ -88,14 +96,14 @@ class MotionRetargeting:
         self.target_motion = MotionSequence(
             num_frames=self.num_frames,
             dof_names=[model.joint(1 + i).name for i in range(model.nu)],
-            body_names=self.source_motion.body_names,
+            body_names=target_bone_names,
             fps=self.fps,
         )
 
         self.tasks = []
         self.frame_tasks = {}
 
-        for body_name in self.source_motion.body_names:
+        for body_name in self.retargeted_bodies:
             mapping_entry = self.mapping_table[body_name]
             target_bone_name = mapping_entry["target"]
             position_weight = mapping_entry["weight"]["position"]
@@ -173,15 +181,22 @@ class MotionRetargeting:
 
         for frame_idx in range(self.num_frames):
             # update task targets
-            for body_name in self.source_motion.body_names:
+            for body_name in self.retargeted_bodies:
                 mapping_entry = self.mapping_table[body_name]
+                source_bone_name = mapping_entry["source"]
                 target_bone_name = mapping_entry["target"]
 
                 # TODO: might be better to optimize the following logic with numpy vectorization
-                source_body_index = self.source_motion.get_body_indices([body_name])[0]
+                source_body_index = self.source_motion.get_body_indices([source_bone_name])[0]
 
-                source_position = self.source_motion.body_positions[frame_idx, source_body_index]
-                source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index]
+                source_position = self.source_motion.body_positions[frame_idx, source_body_index].copy()
+                # get the position offset in (x, y, z) in meters
+                if mapping_entry.get("offset") and mapping_entry["offset"].get("position"):
+                    source_position += np.array(mapping_entry["offset"]["position"])
+
+                source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index].copy()
+                if mapping_entry.get("offset") and mapping_entry["offset"].get("orientation"):
+                    source_orientation = quat_mul(source_orientation, np.array(mapping_entry["offset"]["orientation"]))
 
                 self.frame_tasks[target_bone_name].set_target(mink.SE3(
                     wxyz_xyz=np.concatenate([source_orientation, source_position])
@@ -210,7 +225,7 @@ class MotionRetargeting:
             self.target_motion._dof_positions[frame_idx, :] = self.data.qpos[7:]
 
             # extract body data from the MuJoCo robot after IK solving
-            for i, body_name in enumerate(self.source_motion.body_names):
+            for i, body_name in enumerate(self.retargeted_bodies):
                 mapping_entry = self.mapping_table[body_name]
                 body_id = self.model.body(mapping_entry["target"]).id
 
