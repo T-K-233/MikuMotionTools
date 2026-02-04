@@ -47,7 +47,7 @@ def create_empty_scene(show_world_frame: bool = False) -> str:
 
 def add_body_frames(
     base_xml: str,
-    motion: MotionSequence,
+    body_names: list[str],
     prefix: str = "",
     center_color: tuple[float, float, float] = (1.0, 1.0, 1.0),
 ) -> str:
@@ -56,7 +56,7 @@ def add_body_frames(
 
     Args:
         base_xml: Base XML string with empty worldbody
-        motion: MotionSequence object
+        body_names: List of body names
         prefix: Prefix for the body names
         center_color: RGB color for the center sphere
 
@@ -74,19 +74,13 @@ def add_body_frames(
 
     # Generate frame XML for each frame
     frames_xml = ""
-    for frame_name in motion.body_names:
+    for frame_name in body_names:
         print(f"Adding frame for {frame_name}")
-
-        position = motion.body_positions[0, motion.body_names.index(frame_name)]
-        orientation = motion.body_rotations[0, motion.body_names.index(frame_name)]
-
-        position_string = f"{position[0]} {position[1]} {position[2]}"
-        orientation_string = f"{orientation[0]} {orientation[1]} {orientation[2]} {orientation[3]}"
         center_color_string = f"{center_color[0]} {center_color[1]} {center_color[2]}"
 
         frame_xml = f"""
 <!-- {frame_name} frame -->
-<body name="{prefix}{frame_name}_frame" pos="{position_string}" quat="{orientation_string}" mocap="true">
+<body name="{prefix}{frame_name}_frame" mocap="true">
   <!-- X-axis (red) -->
   <geom name="{prefix}{frame_name}_x_axis" type="cylinder" size="{axis_size}" pos="{axis_length} 0 0" quat="0.707107 0 0.707107 0" rgba="0.8 0.2 0.2 0.75" />
   <!-- Y-axis (green) -->

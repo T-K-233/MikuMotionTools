@@ -1,7 +1,7 @@
 """
 Ubuntu:
 ```bash
-blender ./blender-projects/G1_USD.blend --python ./scripts/examples/export_g1_reset_pose.py
+blender ./blender-projects/G1-USD.blend --python ./scripts/examples/export_g1_reset_pose.py
 ```
 
 Windows:
@@ -37,18 +37,20 @@ O = bpy.ops
 
 """ Everything else follows """
 
-from mikumotion.presets import G1_MMD_YYB_MAPPING
-from mikumotion.motion_sequence import MotionSequence
+import numpy as np
+
+from mikumotion.presets import MMD_YYB_TO_G1_CFG
+from mikumotion.motion_sequence import MotionSequence, translate_motion
 
 
 C = bpy.context
 D = bpy.data
 O = bpy.ops
 
-usd_object = D.objects.get("g1_29dof_mode_6")
+usd_object = D.objects.get("g1_29dof_mode_5")
 
 g1_frames = []
-for value in G1_MMD_YYB_MAPPING.values():
+for value in MMD_YYB_TO_G1_CFG.values():
     if not value["target"]:
         continue
     g1_frames.append(value["target"])
@@ -66,6 +68,10 @@ for frame in usd_object.children:
         motion_index = motion_sequence.get_body_indices([frame.name])[0]
         motion_sequence.body_positions[0, motion_index] = frame.location
         motion_sequence.body_rotations[0, motion_index] = frame.rotation_quaternion
+
+
+# move G1 armature to stand on the ground
+motion_sequence = translate_motion(motion_sequence, np.array([0.0, 0.0, 0.78]))
 
 motion_sequence.save(f"./data/motions/g1_reset_pose.npz")
 print(f"Results saved to ./data/motions/g1_reset_pose.npz")

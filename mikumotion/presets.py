@@ -21,13 +21,13 @@ and https://chingswy.github.io/easymocap-public-doc/database/2_keypoints.html#sm
 """
 
 
-G1_ACCAD_MAPPING = {
+ACCAD_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "Hips",
         "target": "pelvis",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (0.609, 0.359, 0.359, -0.609),
+            "orientation": (0.612, 0.354, 0.354, -0.612),
         },
         "weight": {
             "position": 10.0,
@@ -38,8 +38,8 @@ G1_ACCAD_MAPPING = {
         "source": "LeftUpLeg",
         "target": "left_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -50,8 +50,8 @@ G1_ACCAD_MAPPING = {
         "source": "RightUpLeg",
         "target": "right_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -74,8 +74,8 @@ G1_ACCAD_MAPPING = {
         "source": "LeftLeg",
         "target": "left_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -86,8 +86,8 @@ G1_ACCAD_MAPPING = {
         "source": "RightLeg",
         "target": "right_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -110,7 +110,7 @@ G1_ACCAD_MAPPING = {
         "source": "LeftFoot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
             "orientation": (0.123, 0.696, 0.696, -0.123),
         },
         "weight": {
@@ -122,7 +122,7 @@ G1_ACCAD_MAPPING = {
         "source": "RightFoot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
             "orientation": (0.123, 0.696, 0.696, -0.123),
         },
         "weight": {
@@ -146,7 +146,7 @@ G1_ACCAD_MAPPING = {
         "source": "LeftToeBase",
         "target": "left_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, 0.04, 0.0),
             "orientation": (0.062, -0.704, -0.704, -0.062),
         },
         "weight": {
@@ -158,7 +158,7 @@ G1_ACCAD_MAPPING = {
         "source": "RightToeBase",
         "target": "right_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
+            "position": (0.0, -0.04, 0.0),
             "orientation": (0.062, -0.704, -0.704, -0.062),
         },
         "weight": {
@@ -183,7 +183,7 @@ G1_ACCAD_MAPPING = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, -0.707, 0.0),
         },
         "weight": {
             "position": 0.0,
@@ -195,7 +195,7 @@ G1_ACCAD_MAPPING = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.0, 0.707, 0.0, 0.707),
         },
         "weight": {
             "position": 0.0,
@@ -219,7 +219,7 @@ G1_ACCAD_MAPPING = {
         "target": "left_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, -0.707, 0.0),
         },
         "weight": {
             "position": 1.0,
@@ -231,7 +231,7 @@ G1_ACCAD_MAPPING = {
         "target": "right_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.0, 0.707, 0.0, 0.707),
         },
         "weight": {
             "position": 1.0,
@@ -239,7 +239,7 @@ G1_ACCAD_MAPPING = {
         },
     },
     "left_elbow": {  # 18
-        "source": "LeftForeArm",
+        "source": "",
         "target": "left_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -251,7 +251,7 @@ G1_ACCAD_MAPPING = {
         },
     },
     "right_elbow": {  # 19
-        "source": "RightForeArm",
+        "source": "",
         "target": "right_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -313,13 +313,13 @@ G1_ACCAD_MAPPING = {
 }
 
 
-G1_ACTORCORE_MAPPING = {
+ACTORCORE_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "CC_Base_Pelvis",
         "target": "pelvis",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.0, 0.05),
+            "orientation": (0.455, -0.542, -0.542, -0.455),  # X -100 deg, Z -90 deg
         },
         "weight": {
             "position": 10.0,
@@ -330,8 +330,8 @@ G1_ACTORCORE_MAPPING = {
         "source": "CC_Base_L_Thigh",
         "target": "left_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, -0.08),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -342,8 +342,8 @@ G1_ACTORCORE_MAPPING = {
         "source": "CC_Base_R_Thigh",
         "target": "right_hip_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, -0.08),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -351,7 +351,7 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "spine1": {  # 3
-        "source": "CC_Base_Spine02",
+        "source": "CC_Base_Spine01",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -366,8 +366,8 @@ G1_ACTORCORE_MAPPING = {
         "source": "CC_Base_L_Calf",
         "target": "left_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, -0.03),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -378,8 +378,8 @@ G1_ACTORCORE_MAPPING = {
         "source": "CC_Base_R_Calf",
         "target": "right_knee_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, -0.03),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -402,8 +402,8 @@ G1_ACTORCORE_MAPPING = {
         "source": "CC_Base_L_Foot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, 0.0),
+            "orientation": (0.704, 0.062, -0.062, 0.704),  # X +10 deg, Z +90 deg
         },
         "weight": {
             "position": 0.0,
@@ -414,8 +414,8 @@ G1_ACTORCORE_MAPPING = {
         "source": "CC_Base_R_Foot",
         "target": "",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, 0.0),
+            "orientation": (0.704, 0.062, -0.062, 0.704),  # X +10 deg, Z +90 deg
         },
         "weight": {
             "position": 0.0,
@@ -435,11 +435,11 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "left_foot": {  # 10
-        "source": "CC_Base_L_Foot",
+        "source": "CC_Base_L_ToeBaseShareBone",
         "target": "left_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, 0.05, 0.0),
+            "orientation": (0.706, -0.031, 0.031, 0.706),  # X -5 deg, Z +90 deg
         },
         "weight": {
             "position": 1.0,
@@ -447,11 +447,11 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "right_foot": {  # 11
-        "source": "CC_Base_R_Foot",
+        "source": "CC_Base_R_ToeBaseShareBone",
         "target": "right_ankle_roll_link",
         "offset": {
-            "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "position": (0.0, -0.05, 0.0),
+            "orientation": (0.706, -0.031, 0.031, 0.706),  # X -5 deg, Z +90 deg
         },
         "weight": {
             "position": 1.0,
@@ -459,7 +459,7 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "neck": {  # 12
-        "source": "CC_Base_R_Foot",
+        "source": "CC_Base_NeckTwist02",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -483,7 +483,7 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "right_collar": {  # 14
-        "source": "CC_Base_L_Clavicle",
+        "source": "CC_Base_R_Clavicle",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
@@ -507,11 +507,11 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "left_shoulder": {  # 16
-        "source": "CC_Base_L_Clavicle",
+        "source": "CC_Base_L_Upperarm",
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 0.0,
@@ -519,11 +519,11 @@ G1_ACTORCORE_MAPPING = {
         },
     },
     "right_shoulder": {  # 17
-        "source": "CC_Base_R_Clavicle",
+        "source": "CC_Base_R_Upperarm",
         "target": "right_shoulder_roll_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -535,7 +535,7 @@ G1_ACTORCORE_MAPPING = {
         "target": "left_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -547,7 +547,7 @@ G1_ACTORCORE_MAPPING = {
         "target": "right_elbow_link",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.5, 0.5, -0.5, 0.5),
         },
         "weight": {
             "position": 1.0,
@@ -559,7 +559,7 @@ G1_ACTORCORE_MAPPING = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 0.0,
@@ -571,7 +571,7 @@ G1_ACTORCORE_MAPPING = {
         "target": "",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 0.0,
@@ -583,7 +583,7 @@ G1_ACTORCORE_MAPPING = {
         "target": "left_rubber_hand",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 1.0,
@@ -595,7 +595,7 @@ G1_ACTORCORE_MAPPING = {
         "target": "right_rubber_hand",
         "offset": {
             "position": (0.0, 0.0, 0.0),
-            "orientation": (1.0, 0.0, 0.0, 0.0),
+            "orientation": (0.707, 0.0, 0.0, 0.707),
         },
         "weight": {
             "position": 1.0,
@@ -605,7 +605,7 @@ G1_ACTORCORE_MAPPING = {
 }
 
 
-G1_MMD_YYB_MAPPING = {
+MMD_YYB_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "下半身",
         "target": "pelvis",
@@ -897,7 +897,7 @@ G1_MMD_YYB_MAPPING = {
 }
 
 
-G1_MIXAMO_MAPPING = {
+MIXAMO_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "mixamorig:Hips",
         "target": "pelvis",
@@ -1081,7 +1081,7 @@ G1_MIXAMO_MAPPING = {
 }
 
 
-G1_MESHCAPADE_MAPPING = {
+MESHCAPADE_TO_G1_CFG = {
     "pelvis": {  # 0
         "source": "pelvis",
         "target": "pelvis",
@@ -1310,4 +1310,12 @@ G1_MESHCAPADE_MAPPING = {
             "orientation": 1.0,
         },
     },
+}
+
+PRESETS = {
+    "ACCAD_TO_G1_CFG": ACCAD_TO_G1_CFG,
+    "ACTORCORE_TO_G1_CFG": ACTORCORE_TO_G1_CFG,
+    "MMD_YYB_TO_G1_CFG": MMD_YYB_TO_G1_CFG,
+    "MESHCAPADE_TO_G1_CFG": MESHCAPADE_TO_G1_CFG,
+    "MIXAMO_TO_G1_CFG": MIXAMO_TO_G1_CFG,
 }

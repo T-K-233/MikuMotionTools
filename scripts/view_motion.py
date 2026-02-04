@@ -9,33 +9,32 @@ import matplotlib
 from mikumotion.motion_sequence import MotionSequence
 from mikumotion.viewers import MatplotViewer
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--motion", type=str, required=True, help="Motion file")
-parser.add_argument("--robot", type=str, default="smplx", help="Robot name to select which frame to show")
-parser.add_argument(
-    "--render-scene",
-    action="store_true",
-    default=False,
-    help=(
-        "Whether the scene (space occupied by the skeleton during movement) is rendered instead of a reduced view"
-        " of the skeleton."
-    ),
-)
-parser.add_argument("--matplotlib-backend", type=str, default="TkAgg", help="Matplotlib interactive backend")
-args, _ = parser.parse_known_args()
 
-# https://matplotlib.org/stable/users/explain/figure/backends.html#interactive-backends
-matplotlib.use(args.matplotlib_backend)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--motion", type=str, required=True, help="Motion file")
+    parser.add_argument(
+        "--render-scene",
+        action="store_true",
+        default=False,
+        help=(
+            "Whether the scene (space occupied by the skeleton during movement) is rendered instead of a reduced view"
+            " of the skeleton."
+        ),
+    )
+    parser.add_argument("--show-frames", action="store_true", default=False, help="Show frames")
+    parser.add_argument("--matplotlib-backend", type=str, default="TkAgg", help="Matplotlib interactive backend")
+    args, _ = parser.parse_known_args()
 
-motion = MotionSequence.load(args.motion)
+    # https://matplotlib.org/stable/users/explain/figure/backends.html#interactive-backends
+    matplotlib.use(args.matplotlib_backend)
 
-match args.robot:
-    case "smplx":
-        frames = ["pelvis", "left_hand", "right_hand", "left_ankle", "right_ankle", "left_foot", "right_foot", "head"]
-    case "unitree_g1":
-        frames = ["pelvis", "left_rubber_hand", "right_rubber_hand", "left_ankle_roll_link", "right_ankle_roll_link"]
-    case _:
+    motion = MotionSequence.load(args.motion)
+
+    if args.show_frames:
+        frames = motion.body_names
+    else:
         frames = []
 
-viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=frames)
-viewer.show()
+    viewer = MatplotViewer(motion, render_scene=args.render_scene, show_frames=frames)
+    viewer.show()
