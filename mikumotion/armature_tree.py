@@ -44,28 +44,38 @@ class ArmatureTree:
     https://github.com/NVlabs/CALM/blob/main/calm/poselib/poselib/skeleton/skeleton3d.py
     """
 
-    def __init__(self, body_names: List[str], body_parent_indices: np.ndarray, local_translations: np.ndarray):
+    def __init__(
+        self,
+        body_names: List[str],
+        body_parent_indices: np.ndarray,
+        local_translations: np.ndarray,
+        local_rotations: np.ndarray,
+    ):
         """
         Args:
             body_names: a list of length NUM_BODIES, containing the names for each body.
-            body_parent_indices: an int32-typed numpy array of length NUM_BODIES that represents the edge to its parent. -1
-            represents the root body.
-            local_translations: a numpy array of shape (NUM_BODIES, 3) that gives local translation information.
+            body_parent_indices: an int32-typed numpy array of length NUM_BODIES that represents the edge to its parent.
+            -1 represents the root body.
+            local_translations: a numpy array of shape (NUM_BODIES, 3) that gives local translation information in
+            meters.
+            local_rotations: a numpy array of shape (NUM_BODIES, 4) that gives local rotation information in
+            quaternion (w, x, y, z) format.
         """
-        assert len(body_names) == len(body_parent_indices) == len(local_translations), \
-            "The number of bodies, body parent indices, and local translations must be the same."
+        assert len(body_names) == len(body_parent_indices) == len(local_translations) == len(local_rotations), \
+            "The number of bodies, body parent indices, local translations, and local rotations must be the same."
 
         self._body_names = body_names
         self._body_indices = {body_names[i]: i for i in range(len(body_names))}
         self._body_parent_indices = body_parent_indices.astype(np.int32)
         self._local_translations = local_translations.astype(np.float32)
+        self._local_rotations = local_rotations.astype(np.float32)
 
     def __len__(self) -> int:
-        """ Number of bodies in the armature tree """
+        """ Number of bodies in the armature tree. """
         return len(self.body_names)
 
     def __getitem__(self, item: int) -> str:
-        """ Get the name of the body given the index """
+        """ Get the name of the body given the index. """
         return self.body_names[item]
 
     def __repr__(self) -> str:
@@ -73,37 +83,45 @@ class ArmatureTree:
             """ArmatureTree(
     body_names={},
     body_parent_indices={},
-    local_translations={})
+    local_translations={},
+    local_rotations={},
+)
 """.format(
                 repr(self.body_names),
                 repr(self.body_parent_indices),
                 repr(self.local_translations),
+                repr(self.local_rotations),
             )
         )
 
     @property
     def num_bodies(self) -> int:
-        """ Number of bodies in the armature tree """
+        """ Number of bodies in the armature tree. """
         return len(self)
 
     @property
     def body_names(self) -> List[str]:
-        """ List of body names """
+        """ List of body names. """
         return self._body_names
 
     @property
     def body_parent_indices(self) -> np.ndarray:
-        """ Array of body parent indices """
+        """ Array of body parent indices. """
         return self._body_parent_indices
 
     @property
     def local_translations(self) -> np.ndarray:
-        """ Array of local translations """
+        """ Array of local translations in meters. """
         return self._local_translations
 
-    def index_of(self, body_name: str) -> int:
+    @property
+    def local_rotations(self) -> np.ndarray:
+        """ Array of local rotations in quaternion. """
+        return self._local_rotations
+
+    def get_index(self, body_name: str) -> int:
         """
-        Get the index of the given body
+        Get the index of the given body.
 
         Args:
             body_name: the name of the body
@@ -112,20 +130,34 @@ class ArmatureTree:
         """
         return self._body_indices[body_name]
 
-    def parent_of(self, body_name: str) -> str:
+    def get_parent_index(self, body_name: str) -> int:
         """
-        Get the name of the parent of the given body
+        Get the index of the parent of the given body.
+
+        Args:
+            body_name: the name of the body
+        Returns:
+            The index of the parent of the given body
+        """
+        return self._body_parent_indices[self.get_index(body_name)]
+
+    def get_parent_name(self, body_name: str) -> str | None:
+        """
+        Get the name of the parent of the given body.
 
         Args:
             body_name: the name of the body
         Returns:
             The name of the parent of the given body
         """
-        return self.body_names[self.body_parent_indices[self.index_of(body_name)]]
+        parent_index = self.get_parent_index(body_name)
+        if parent_index == -1:
+            return None  # root
+        return self._body_names[parent_index]
 
     def to_file(self, path: str) -> None:
         """
-        Serialize the armature tree to a `.npz` file
+        Serialize the armature tree to a `.npz` file.
 
         Args:
             path: the path of the file
@@ -134,6 +166,7 @@ class ArmatureTree:
             "body_names": self.body_names,
             "body_parent_indices": self.body_parent_indices,
             "local_translations": self.local_translations,
+            "local_rotations": self.local_rotations,
         }
         np.savez(path, **serialized)
 
@@ -166,15 +199,19 @@ class ArmatureTree:
         body_names = []
         body_parent_indices = []
         local_translations = []
+        local_rotations = []
 
         # recursively walk through the XML tree and add all bodies
         def _add_body_from_xml(xml_node, body_parent_index, body_index):
             body_name = xml_node.attrib.get("name")
-            # parse the local translation into a numpy array
             position_offset = np.fromstring(xml_node.attrib.get("pos", "0 0 0"), dtype=np.float32, sep=" ")
+            rotation_offset = np.fromstring(xml_node.attrib.get("quat", "1 0 0 0"), dtype=np.float32, sep=" ")
+
             body_names.append(body_name)
             body_parent_indices.append(body_parent_index)
             local_translations.append(position_offset)
+            local_rotations.append(rotation_offset)
+
             current_body_index = body_index
             body_index += 1
             for next_node in xml_node.findall("body"):
@@ -187,4 +224,5 @@ class ArmatureTree:
             body_names,
             np.array(body_parent_indices, dtype=np.int32),
             np.array(local_translations, dtype=np.float32),
+            np.array(local_rotations, dtype=np.float32),
         )
