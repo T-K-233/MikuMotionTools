@@ -39,8 +39,8 @@ from mikumotion.armature_tree import ArmatureTree
 np.set_printoptions(precision=3, suppress=True)
 
 xml_path = "/home/tk/Desktop/Pianist/source/pianist/data/robots/ude_better_dummy/mjcf/ude_dummy.xml"
-
 tree = ArmatureTree.from_mjcf(xml_path)
+
 print(tree)
 
 blender.build_armature(tree)
