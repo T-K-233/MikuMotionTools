@@ -21,10 +21,10 @@ blend_path = os.path.dirname(bpy.data.filepath)
 mikumotion_path = os.getcwd()
 
 if blend_path not in sys.path:
-   sys.path.append(blend_path)
+    sys.path.append(blend_path)
 
 if mikumotion_path not in sys.path:
-   sys.path.append(mikumotion_path)
+    sys.path.append(mikumotion_path)
 
 from mikumotion import blender
 
