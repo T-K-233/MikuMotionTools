@@ -226,3 +226,9 @@ class ArmatureTree:
             np.array(local_translations, dtype=np.float32),
             np.array(local_rotations, dtype=np.float32),
         )
+
+
+if __name__ == "__main__":
+    xml_path = "/home/tk/Desktop/Pianist/source/pianist/data/robots/ude_better_dummy/mjcf/ude_dummy.xml"
+    tree = ArmatureTree.from_mjcf(xml_path)
+    print(tree)

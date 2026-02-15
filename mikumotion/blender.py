@@ -1,10 +1,9 @@
-from typing import Callable
-
 import numpy as np
 import bpy
 from bpy_types import Object, PoseBone
-from mathutils import Vector, Quaternion
+from mathutils import Vector, Quaternion, Matrix
 
+from .armature_tree import ArmatureTree
 from .motion_sequence import MotionSequence
 from .math import quat_mul
 
@@ -205,275 +204,42 @@ def build_body_motion_data(
     return motion
 
 
-def construct_skeleton_tree():
-    skeleton_tree_usd = {
-        "node_names": [  # joint names
-            "pelvis",                     # 0
-            "waist_yaw",                  # 1
-            "waist_roll",                 # 2
-            "waist_pitch",                # 3
-            "neck_yaw",                   # 4
-            "neck_roll",                  # 5
-            "neck_pitch",                 # 6
-            "arm_left_shoulder_pitch",    # 7
-            "arm_left_shoulder_roll",     # 8
-            "arm_left_shoulder_yaw",      # 9
-            "arm_left_elbow_pitch",       # 10
-            "arm_left_wrist_yaw",         # 11
-            "arm_left_wrist_roll",        # 13
-            "arm_left_wrist_pitch",       # 12
-            "arm_right_shoulder_pitch",   # 14
-            "arm_right_shoulder_roll",    # 15
-            "arm_right_shoulder_yaw",     # 16
-            "arm_right_elbow_pitch",      # 17
-            "arm_right_wrist_yaw",        # 18
-            "arm_right_wrist_roll",       # 20
-            "arm_right_wrist_pitch",      # 19
-            "leg_left_hip_pitch",         # 21
-            "leg_left_hip_roll",          # 22
-            "leg_left_hip_yaw",           # 23
-            "leg_left_knee_pitch",        # 24
-            "leg_left_ankle_yaw",         # 25
-            "leg_left_ankle_pitch",       # 26
-            "leg_left_ankle_roll",        # 27
-            "leg_right_hip_pitch",        # 28
-            "leg_right_hip_roll",         # 29
-            "leg_right_hip_yaw",          # 30
-            "leg_right_knee_pitch",       # 31
-            "leg_right_ankle_yaw",        # 32
-            "leg_right_ankle_pitch",      # 33
-            "leg_right_ankle_roll",       # 34
-        ],
-        "link_names": [
-            "pelvis",                     # 0
-            "chest_yaw",                  # 1
-            "chest_roll",                 # 2
-            "chest_pitch",                # 3
-            "head_yaw",                   # 4
-            "head_roll",                  # 5
-            "head_pitch",                 # 6
-            "arm_left_upper_pitch",       # 7
-            "arm_left_upper_roll",        # 8
-            "arm_left_upper_yaw",         # 9
-            "arm_left_forearm_pitch",     # 10
-            "arm_left_hand_yaw",          # 11
-            "arm_left_hand_roll",         # 12
-            "arm_left_hand_pitch",        # 13
-            "arm_right_upper_pitch",      # 14
-            "arm_right_upper_roll",       # 15
-            "arm_right_upper_yaw",        # 16
-            "arm_right_forearm_pitch",    # 17
-            "arm_right_hand_yaw",         # 18
-            "arm_right_hand_roll",        # 19
-            "arm_right_hand_pitch",       # 20
-            "leg_left_thigh_pitch",       # 21
-            "leg_left_thigh_roll",        # 22
-            "leg_left_thigh_yaw",         # 23
-            "leg_left_calf_pitch",        # 24
-            "leg_left_foot_yaw",          # 25
-            "leg_left_foot_pitch",        # 26
-            "leg_left_foot_roll",         # 27
-            "leg_right_thigh_pitch",      # 28
-            "leg_right_thigh_roll",       # 29
-            "leg_right_thigh_yaw",        # 30
-            "leg_right_calf_pitch",       # 31
-            "leg_right_foot_yaw",         # 32
-            "leg_right_foot_pitch",       # 33
-            "leg_right_foot_roll",        # 34
-        ],
-        "parent_indices": {
-            "arr": np.array([
-                -1,
-                0, 1, 2, 3, 4, 5,
-                3, 7, 8, 9, 10, 11, 12,
-                3, 14, 15, 16, 17, 18, 19,
-                0, 21, 22, 23, 24, 25, 26,
-                0, 28, 29, 30, 31, 32, 33
-            ]),
-            "context": {"dtype": "int64"}
-            },
-        "global_translations": [],
-        "bone_orientations": [
-            [ .0,  .1,  .0],
-            [ .0,  .0,  .1],
-            [ .1,  .0,  .0],
-            [ .0,  .1,  .0],
-            [ .0,  .0,  .1],
-            [ .1,  .0,  .0],
-            [ .0,  .1,  .0],
-
-            [ .0,  .1,  .0],
-            [ .1,  .0,  .0],
-            [ .0, -.1*np.cos(np.deg2rad(60)),  .1*np.sin(np.deg2rad(60))],
-            [ .0,  .1*np.sin(np.deg2rad(60)),  .1*np.cos(np.deg2rad(60))],
-            [ .0, -.1*np.cos(np.deg2rad(60)),  .1*np.sin(np.deg2rad(60))],
-            [ .0,  .1*np.sin(np.deg2rad(60)),  .1*np.cos(np.deg2rad(60))],
-            [ .1,  .0,  .0],
-            [ .0,  .1,  .0],
-            [ .1,  .0,  .0],
-            [ .0,  .1*np.cos(np.deg2rad(60)),  .1*np.sin(np.deg2rad(60))],
-            [ .0,  .1*np.sin(np.deg2rad(60)), -.1*np.cos(np.deg2rad(60))],
-            [ .0,  .1*np.cos(np.deg2rad(60)),  .1*np.sin(np.deg2rad(60))],
-            [ .0,  .1*np.sin(np.deg2rad(60)), -.1*np.cos(np.deg2rad(60))],
-            [ .1,  .0,  .0],
-
-            [ .0,  .1,  .0],
-            [ .1,  .0,  .0],
-            [ .0,  .0,  .1],
-            [ .0,  .1,  .0],
-            [ .0,  .0,  .1],
-            [ .0,  .1,  .0],
-            [ .1,  .0,  .0],
-
-            [ .0,  .1,  .0],
-            [ .1,  .0,  .0],
-            [ .0,  .0,  .1],
-            [ .0,  .1,  .0],
-            [ .0,  .0,  .1],
-            [ .0,  .1,  .0],
-            [ .1,  .0,  .0],
-        ],
-    }
-
-    for link_name in skeleton_tree_usd["link_names"]:
-        skeleton_tree_usd["global_translations"].append(np.array(D.objects.get(link_name).location))
-
-    # skeleton_tree_usd["global_translations"] += np.array([0, 0, 0.6])
-
-    return skeleton_tree_usd
+def matrix_from_translation_rotation(
+    translation: np.ndarray = np.zeros((3,), dtype=np.float32),
+    rotation: np.ndarray = np.array([1, 0, 0, 0], dtype=np.float32),
+) -> Matrix:
+    """ Convert a transformation to a matrix. """
+    quat = Quaternion(rotation)  # (w, x, y, z)
+    return Matrix.Translation(Vector(translation)) @ quat.to_matrix().to_4x4()
 
 
-class SkeletonTree:
-    skeleton_tree_a_pose = {
-        "node_names": [
-            "pelvis",               # 0
-            "chest",                # 1
-            "head",                 # 2
-            "arm_left_upper",       # 3
-            "arm_left_lower",       # 4
-            "arm_left_hand",        # 5
-            "arm_right_upper",      # 6
-            "arm_right_lower",      # 7
-            "arm_right_hand",       # 8
-            "leg_left_upper",       # 9
-            "leg_left_lower",       # 10
-            "leg_left_foot",        # 11
-            "leg_right_upper",      # 12
-            "leg_right_lower",      # 13
-            "leg_right_foot",       # 14
-        ],
-        "parent_indices": {
-            "arr": np.array([-1, 0, 1, 1, 3, 4, 1, 6, 7, 0, 9, 10, 0, 12, 13]),
-            "context": {"dtype": "int64"}
-            },
-        "local_translations": [
-            [  .000,   .000,  0.600],
-            [  .000,   .000,  0.100],
-            [  .000,   .000,  0.300],
-            [-0.018,  0.066,  0.218],
-            [  .000,  0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000,  0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [-0.018, -0.066,  0.218],
-            [  .000, -0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000, -0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000,  0.084,   .000],
-            [  .000, -0.030, -0.255],
-            [-0.023,   .000, -0.293],
-            [  .000, -0.084,   .000],
-            [  .000,  0.030, -0.255],
-            [-0.023,   .000, -0.293],
-        ],
-        "bone_orientations": [
-            [  .000,   .000,  0.100],
-            [  .000,   .000,  0.218],
-            [  .000,   .000,  0.100],
-            [  .000,  0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000,  0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000,  0.100*np.cos(np.deg2rad(60)), -0.100*np.sin(np.deg2rad(60))],
-            [  .000, -0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000, -0.150*np.cos(np.deg2rad(60)), -0.150*np.sin(np.deg2rad(60))],
-            [  .000, -0.100*np.cos(np.deg2rad(60)), -0.100*np.sin(np.deg2rad(60))],
-            [  .000,   .000, -0.250],
-            [-0.023,   .000, -0.290],
-            [ 0.066,   .000, -0.056],
-            [  .000,   .000, -0.250],
-            [-0.023,   .000, -0.290],
-            [ 0.066,   .000, -0.056],
-        ],
-    }
+def build_armature(
+    tree: ArmatureTree,
+    name="Armature",
+    default_length=0.1,
+    show_names=True,
+    show_axes=True,
+):
+    """
+    Build an armature from an ArmatureTree.
 
-    skeleton_tree_t_pose = {
-        "node_names": [
-            "pelvis",               # 0
-            "chest",                # 1
-            "head",                 # 2
-            "arm_left_upper",       # 3
-            "arm_left_lower",       # 4
-            "arm_left_hand",        # 5
-            "arm_right_upper",      # 6
-            "arm_right_lower",      # 7
-            "arm_right_hand",       # 8
-            "leg_left_upper",       # 9
-            "leg_left_lower",       # 10
-            "leg_left_foot",        # 11
-            "leg_right_upper",      # 12
-            "leg_right_lower",      # 13
-            "leg_right_foot",       # 14
-        ],
-        "parent_indices": {
-            "arr": np.array([-1, 0, 1, 1, 3, 4, 1, 6, 7, 0, 9, 10, 0, 12, 13]),
-            "context": {"dtype": "int64"}
-            },
-        "local_translations": [
-            [  .000,   .000,  0.600],
-            [  .000,   .000,  0.100],
-            [  .000,   .000,  0.300],
-            [-0.018,  0.066,  0.218],
-            [  .000,  0.150,   .000],
-            [  .000,  0.150,   .000],
-            [-0.018, -0.066,  0.218],
-            [  .000, -0.150,   .000],
-            [  .000, -0.150,   .000],
-            [  .000,  0.084,   .000],
-            [  .000, -0.030, -0.255],
-            [-0.023,   .000, -0.293],
-            [  .000, -0.084,   .000],
-            [  .000,  0.030, -0.255],
-            [-0.023,   .000, -0.293],
-        ],
-        "bone_orientations": [
-            [  .000,   .000,  0.100],
-            [  .000,   .000,  0.218],
-            [  .000,   .000,  0.100],
-            [  .000,  0.150,   .000],
-            [  .000,  0.150,   .000],
-            [  .000,  0.100,   .000],
-            [  .000, -0.150,   .000],
-            [  .000, -0.150,   .000],
-            [  .000, -0.100,   .000],
-            [  .000,   .000, -0.250],
-            [-0.023,   .000, -0.290],
-            [ 0.066,   .000, -0.056],
-            [  .000,   .000, -0.250],
-            [-0.023,   .000, -0.290],
-            [ 0.066,   .000, -0.056],
-        ],
-    }
-
-
-def build_armature(skeleton_tree: dict, armature_name="Armature"):
-    armature = D.objects.get(armature_name)
-
+    Args:
+        tree: The ArmatureTree to build the armature from.
+        name: The name of the armature.
+        default_length: The default length of the bones (applied to leaf bones).
+        show_names: Whether to show the names of the bones on the armature.
+        show_axes: Whether to show the axes of the bones on the armature.
+    """
     # delete the existing armature, if any
+    armature = D.objects.get(name)
     if armature:
         O.object.mode_set(mode="OBJECT")
         armature.select_set(True)
         O.object.delete()
 
-
     O.object.armature_add(enter_editmode=False, align="WORLD", scale=(1, 1, 1))
     armature = C.active_object
-    armature.name = armature_name
+    armature.name = name
 
     # switch to edit mode
     O.object.mode_set(mode="EDIT")
@@ -481,49 +247,67 @@ def build_armature(skeleton_tree: dict, armature_name="Armature"):
 
     # reconfigure root bone
     root = edit_bones[0]
-    root.name = "root"
-    root.tail = Vector([0.5, 0, 0])
+    root.name = tree.body_names[0]
+    root.head = Vector(tree.local_translations[0])
+    root.tail = Vector([default_length, 0, 0])  # root always points towards forward (+X axis)
 
+    # first, create all bones
+    # root is already created by the armature_add operation
+    for body_name in tree.body_names[1:]:
+        edit_bones.new(body_name)
 
-    for name in skeleton_tree["node_names"]:
-        edit_bones.new(name)
+    # blender uses world frame for bone transformation,
+    # so we need to compute the global transformations for all bodies
+    global_transforms: list[Matrix] = []
+    parent_indices = tree.body_parent_indices
 
-    for i, name in enumerate(skeleton_tree["node_names"]):
-        parent_idx = skeleton_tree["parent_indices"]["arr"][i]
-
-        bone = edit_bones.get(name)
-
-        if skeleton_tree.get("local_translations"):
-            # use local translation
-            if parent_idx == -1:
-                bone.head = Vector(skeleton_tree["local_translations"][i])
-                bone.parent = root
-            else:
-                parent_bone_name = skeleton_tree["node_names"][parent_idx]
-                parent_bone = edit_bones.get(parent_bone_name)
-
-                bone.head = parent_bone.head + Vector(skeleton_tree["local_translations"][i])
-                bone.parent = parent_bone
-
+    for body_index in range(tree.num_bodies):
+        parent_index = parent_indices[body_index]
+        local_transform = matrix_from_translation_rotation(
+            tree.local_translations[body_index],
+            tree.local_rotations[body_index],
+        )
+        if parent_index == -1:
+            global_transforms.append(local_transform)
         else:
-            # use global translation
-            if parent_idx == -1:
-                bone.parent = root
-            else:
-                parent_bone_name = skeleton_tree["node_names"][parent_idx]
-                parent_bone = edit_bones.get(parent_bone_name)
+            parent_transform = global_transforms[parent_index]
 
-                bone.parent = parent_bone
+            transform = parent_transform @ local_transform   # G_child = G_parent @ L_child
+            global_transforms.append(transform)
 
-            bone.head = Vector(skeleton_tree["global_translations"][i])
+    for body_name in tree.body_names[1:]:
+        body_index = tree.get_index(body_name)
+        parent_name = tree.get_parent_name(body_name)
+        parent_index = tree.get_parent_index(body_name)
+        bone = edit_bones.get(body_name)
 
-        bone.tail = bone.head + Vector(skeleton_tree["bone_orientations"][i])
+        parent_bone = edit_bones.get(parent_name)
+
+        world_loc = global_transforms[body_index].to_translation()
+        world_rot = global_transforms[body_index].to_quaternion()
+        bone.head = world_loc
+        bone.parent = parent_bone
+
+        bone_vector = Vector((0, 0, default_length))
+        bone_vector.rotate(world_rot)
+        print(f"bone {body_name}: {world_loc}, {world_rot}")
+        bone.tail = bone.head + bone_vector
+
+        # update the parent to have correct length
+        # TODO: this is not very correct, since the bone might be pointing in a different
+        # direction rather than towards the child's head
+        # offset_from_parent = world_loc - global_transforms[parent_index].to_translation()
+        # parent_bone.length = offset_from_parent.length
 
     O.object.mode_set(mode="OBJECT")
 
-    bones = D.objects.get("Armature").pose.bones
+    bones = D.objects.get(name).pose.bones
     for bone in bones:
         bone.rotation_mode = "XYZ"
+
+    armature.data.show_names = show_names
+    armature.data.show_axes = show_axes
+
 
 def bind_to_armature(skeleton_tree: dict):
 
