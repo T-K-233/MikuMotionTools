@@ -1,6 +1,6 @@
 import numpy as np
 import bpy
-from bpy_types import Object, PoseBone
+from bpy.types import Object, PoseBone
 from mathutils import Vector, Quaternion, Matrix
 
 from .armature_tree import ArmatureTree
