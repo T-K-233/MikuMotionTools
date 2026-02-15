@@ -245,11 +245,25 @@ def build_armature(
     O.object.mode_set(mode="EDIT")
     edit_bones = armature.data.edit_bones
 
-    # reconfigure root bone
-    root = edit_bones[0]
-    root.name = tree.body_names[0]
-    root.head = Vector(tree.local_translations[0])
-    root.tail = Vector([default_length, 0, 0])  # root always points towards forward (+X axis)
+    if (tree.local_translations[0] != 0).any():
+        print(f"WARNING: root bone {tree.body_names[0]} has non-zero translation: {tree.local_translations[0]}")
+        print("Adding new root bone")
+        all_root = edit_bones[0]
+        all_root.name = "root"
+        all_root.length = default_length
+        tree_root_name = tree.body_names[0]
+        edit_bones.new(tree_root_name)
+        tree_root = edit_bones.get(tree_root_name)
+        tree_root.head = Vector(tree.local_translations[0])
+        tree_root.tail = Vector(tree.local_translations[0] + [default_length, 0, 0])  # root always points towards forward (+X axis)
+        tree_root.parent = all_root
+
+    else:
+        # reconfigure root bone
+        root = edit_bones[0]
+        root.name = tree.body_names[0]
+        root.head = Vector(tree.local_translations[0])
+        root.tail = Vector([default_length, 0, 0])  # root always points towards forward (+X axis)
 
     # first, create all bones
     # root is already created by the armature_add operation
