@@ -56,6 +56,7 @@ CONFIG = RetargetConfig(
     auto_map_same_names=False,
     ignore_twist=False,
     bone_axis_local=Vector((0.0, 1.0, 0.0)),
+    use_rest_orientation_offsets=True,
     use_scene_frame_range=True,
     frame_start=1,
     frame_end=250,

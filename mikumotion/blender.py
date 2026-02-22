@@ -28,6 +28,7 @@ class RetargetConfig:
     auto_map_same_names: bool = False
     ignore_twist: bool = False
     bone_axis_local: "Vector" = None
+    use_rest_orientation_offsets: bool = True
     use_scene_frame_range: bool = True
     frame_start: int = 1
     frame_end: int = 250
@@ -464,6 +465,78 @@ def get_source_delta_world(source_obj, source_bone_name):
     return src_pose_w @ src_rest_w.inverted()
 
 
+def compute_rest_orientation_offsets(
+    source_obj: Object,
+    target_obj: Object,
+    bone_map: "dict[str, str]",
+) -> "dict[str, Matrix]":
+    """
+    Per target bone:
+      R_offset_world = R_tgt_rest_world * inv(R_src_rest_world)
+    so we can do:
+      R_tgt_pose_world = R_offset_world * R_src_pose_world
+    """
+    offsets = {}
+    for tgt_name, src_name in bone_map.items():
+        src_rest_r = rot3_orthonormalized(get_rest_world_matrix(source_obj, src_name).to_3x3())
+        tgt_rest_r = rot3_orthonormalized(get_rest_world_matrix(target_obj, tgt_name).to_3x3())
+        offsets[tgt_name] = rot3_orthonormalized(tgt_rest_r @ src_rest_r.inverted())
+    return offsets
+
+
+def get_source_pose_world_rot(source_obj: Object, source_bone_name: str) -> Matrix:
+    pose_w = get_pose_world_matrix(source_obj, source_bone_name)
+    return rot3_orthonormalized(pose_w.to_3x3())
+
+
+def get_target_desired_world_rotation(
+    source_obj: Object,
+    target_obj: Object,
+    source_bone_name: str,
+    target_bone_name: str,
+    *,
+    rest_rot_offsets: "dict[str, Matrix] | None" = None,
+    use_rest_orientation_offsets: bool = True,
+    ignore_twist: bool = False,
+    bone_axis_local: "Vector | None" = None,
+) -> Matrix:
+    """
+    Returns desired target WORLD rotation (3x3).
+    Supports two modes:
+      - offset mode: R_tgt = R_offset * R_src_pose
+      - old delta mode: R_tgt = delta_src * R_tgt_rest
+    """
+    if bone_axis_local is None:
+        bone_axis_local = Vector((0.0, 1.0, 0.0))
+
+    if use_rest_orientation_offsets and rest_rot_offsets is not None:
+        src_pose_r = get_source_pose_world_rot(source_obj, source_bone_name)
+
+        if ignore_twist:
+            src_rest_r = rot3_orthonormalized(get_rest_world_matrix(source_obj, source_bone_name).to_3x3())
+            delta_r = rot3_orthonormalized(src_pose_r @ src_rest_r.inverted())
+            twist_axis_w = (src_rest_r @ bone_axis_local).normalized()
+            dq = remove_twist_from_quat(delta_r.to_quaternion(), twist_axis_w)
+            delta_r = rot3_orthonormalized(dq.to_matrix())
+            src_pose_r = rot3_orthonormalized(delta_r @ src_rest_r)
+
+        tgt_desired_world_r = rot3_orthonormalized(rest_rot_offsets[target_bone_name] @ src_pose_r)
+        return tgt_desired_world_r
+
+    # Fallback (old assumption: same rest orientation)
+    src_delta_w = get_source_delta_world(source_obj, source_bone_name)
+    src_delta_world_r = rot3_orthonormalized(src_delta_w.to_3x3())
+
+    if ignore_twist:
+        src_rest_r = rot3_orthonormalized(get_rest_world_matrix(source_obj, source_bone_name).to_3x3())
+        twist_axis_w = (src_rest_r @ bone_axis_local).normalized()
+        dq = remove_twist_from_quat(src_delta_world_r.to_quaternion(), twist_axis_w)
+        src_delta_world_r = rot3_orthonormalized(dq.to_matrix())
+
+    tgt_rest_r = rot3_orthonormalized(get_rest_world_matrix(target_obj, target_bone_name).to_3x3())
+    return rot3_orthonormalized(src_delta_world_r @ tgt_rest_r)
+
+
 def build_desired_target_pose_matrix_objspace(
     source_obj: Object,
     target_obj: Object,
@@ -474,6 +547,8 @@ def build_desired_target_pose_matrix_objspace(
     translation_source_bone_name: str | None = None,
     ignore_twist: bool = False,
     bone_axis_local: Vector | None = None,
+    rest_rot_offsets: "dict[str, Matrix] | None" = None,
+    use_rest_orientation_offsets: bool = True,
 ) -> Matrix:
     """
     Builds desired PoseBone.matrix in target ARMATURE OBJECT SPACE.
@@ -483,29 +558,20 @@ def build_desired_target_pose_matrix_objspace(
     if bone_axis_local is None:
         bone_axis_local = Vector((0.0, 1.0, 0.0))
 
-    # ---------------- Rotation source (normal mapped source bone)
-    src_delta_w = get_source_delta_world(source_obj, source_bone_name)
-    src_delta_world_r = rot3_orthonormalized(src_delta_w.to_3x3())
-
-    if ignore_twist:
-        src_bone = source_obj.data.bones[source_bone_name]
-        src_rest_rot_w = (source_obj.matrix_world @ src_bone.matrix_local).to_3x3()
-        src_rest_rot_w = rot3_orthonormalized(src_rest_rot_w)
-        twist_axis_w = (src_rest_rot_w @ bone_axis_local).normalized()
-
-        dq = src_delta_world_r.to_quaternion()
-        dq = remove_twist_from_quat(dq, twist_axis_w)
-        src_delta_world_r = rot3_orthonormalized(dq.to_matrix())
-
-    tgt_rest_w = get_rest_world_matrix(target_obj, target_bone_name)
-    tgt_rest_world_r = rot3_orthonormalized(tgt_rest_w.to_3x3())
-
-    tgt_desired_world_r = src_delta_world_r @ tgt_rest_world_r
-    tgt_desired_world_r = rot3_orthonormalized(tgt_desired_world_r)
+    # ---------------- Rotation (with rest-offset mapping support)
+    tgt_desired_world_r = get_target_desired_world_rotation(
+        source_obj=source_obj,
+        target_obj=target_obj,
+        source_bone_name=source_bone_name,
+        target_bone_name=target_bone_name,
+        rest_rot_offsets=rest_rot_offsets,
+        use_rest_orientation_offsets=use_rest_orientation_offsets,
+        ignore_twist=ignore_twist,
+        bone_axis_local=bone_axis_local,
+    )
 
     arm_world_r = rot3_orthonormalized(target_obj.matrix_world.to_3x3())
-    tgt_desired_obj_r = arm_world_r.inverted() @ tgt_desired_world_r
-    tgt_desired_obj_r = rot3_orthonormalized(tgt_desired_obj_r)
+    tgt_desired_obj_r = rot3_orthonormalized(arm_world_r.inverted() @ tgt_desired_world_r)
 
     tgt_pb = target_obj.pose.bones[target_bone_name]
     cur_obj_pose = tgt_pb.matrix.copy()
@@ -516,6 +582,7 @@ def build_desired_target_pose_matrix_objspace(
             translation_source_bone_name = source_bone_name
 
         src_delta_w_for_translation = get_source_delta_world(source_obj, translation_source_bone_name)
+        tgt_rest_w = get_rest_world_matrix(target_obj, target_bone_name)
 
         tgt_desired_world_full = src_delta_w_for_translation @ tgt_rest_w
         tgt_desired_obj_full = target_obj.matrix_world.inverted() @ tgt_desired_world_full
@@ -584,6 +651,8 @@ def retarget_frame(
     *,
     ignore_twist: bool = False,
     bone_axis_local: Vector | None = None,
+    rest_rot_offsets: "dict[str, Matrix] | None" = None,
+    use_rest_orientation_offsets: bool = True,
 ) -> None:
     sorted_target_bones = sorted(bone_map.keys(), key=lambda n: get_bone_depth(target_obj, n))
 
@@ -604,6 +673,8 @@ def retarget_frame(
             translation_source_bone_name=(translation_root_source if allow_translation else None),
             ignore_twist=ignore_twist,
             bone_axis_local=bone_axis_local,
+            rest_rot_offsets=rest_rot_offsets,
+            use_rest_orientation_offsets=use_rest_orientation_offsets,
         )
 
         pb.matrix = desired_obj_pose
@@ -682,6 +753,12 @@ class WM_OT_modal_retarget_motion(bpy.types.Operator):
                 f'TRANSLATION_ROOT_SOURCE "{cfg.translation_root_source}" not found in source armature.',
             )
 
+        rest_rot_offsets = (
+            compute_rest_orientation_offsets(source_obj, target_obj, bone_map)
+            if cfg.use_rest_orientation_offsets
+            else None
+        )
+
         scene = context.scene
         frame_start = scene.frame_start if cfg.use_scene_frame_range else cfg.frame_start
         frame_end = scene.frame_end if cfg.use_scene_frame_range else cfg.frame_end
@@ -697,6 +774,8 @@ class WM_OT_modal_retarget_motion(bpy.types.Operator):
             "bone_map": bone_map,
             "translation_root_target": cfg.translation_root_target,
             "translation_root_source": cfg.translation_root_source,
+            "rest_rot_offsets": rest_rot_offsets,
+            "use_rest_orientation_offsets": cfg.use_rest_orientation_offsets,
             "frame_start": frame_start,
             "frame_end": frame_end,
             "frame": frame_start,
@@ -708,6 +787,7 @@ class WM_OT_modal_retarget_motion(bpy.types.Operator):
         }
 
         print(f"[INFO] Translation source bone: {cfg.translation_root_source}")
+        print(f"[INFO] Rest orientation offsets: {'ENABLED' if cfg.use_rest_orientation_offsets else 'DISABLED'}")
         print(f"[INFO] Translation target bone: {cfg.translation_root_target}")
         print(f"[INFO] Retargeting frames {frame_start}..{frame_end}")
         print(f"[INFO] Bone count: {len(bone_map)}")
@@ -767,6 +847,8 @@ class WM_OT_modal_retarget_motion(bpy.types.Operator):
                     translation_root_source=st["translation_root_source"],
                     ignore_twist=ignore_twist,
                     bone_axis_local=bone_axis_local,
+                    rest_rot_offsets=st.get("rest_rot_offsets"),
+                    use_rest_orientation_offsets=st.get("use_rest_orientation_offsets", True),
                 )
 
                 if insert_keyframes:
