@@ -1,9 +1,55 @@
 import numpy as np
 import bpy
+from dataclasses import dataclass
+from typing import Any
+
 from bpy.types import Object, PoseBone
-from mathutils import Vector, Quaternion, Matrix
+from mathutils import Matrix, Quaternion, Vector
+
 
 from .armature_tree import ArmatureTree
+
+# ============================================================
+# RETARGET CONFIG
+# ============================================================
+
+_current_retarget_config: "RetargetConfig | None" = None
+
+
+@dataclass
+class RetargetConfig:
+    """Configuration for motion retargeting. Set via set_retarget_config() before invoking the operator."""
+
+    source_armature_name: str
+    target_armature_name: str
+    bone_map: "dict[str, str]"  # target -> source
+    translation_root_source: str
+    translation_root_target: str
+    auto_map_same_names: bool = False
+    ignore_twist: bool = False
+    bone_axis_local: "Vector" = None
+    use_scene_frame_range: bool = True
+    frame_start: int = 1
+    frame_end: int = 250
+    insert_keyframes: bool = True
+    clear_existing_keys: bool = True
+    frames_per_tick: int = 1
+    timer_step_sec: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.bone_axis_local is None:
+            self.bone_axis_local = Vector((0.0, 1.0, 0.0))
+
+
+def set_retarget_config(config: RetargetConfig) -> None:
+    """Set the retarget config to use when the modal operator is invoked (by scripts)."""
+    global _current_retarget_config
+    _current_retarget_config = config
+
+
+def get_retarget_config() -> "RetargetConfig | None":
+    """Get the current retarget config, if any."""
+    return _current_retarget_config
 from .motion_sequence import MotionSequence
 from .math import quat_mul
 
@@ -345,6 +391,414 @@ def bind_to_armature(skeleton_tree: dict):
 
         # restore world matrix to maintain global transform
         frame.matrix_world = matrix_world.copy()
+
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def quat_normalized_safe(q: Quaternion) -> Quaternion:
+    mag2 = q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z
+    if mag2 < 1e-16:
+        return Quaternion((1.0, 0.0, 0.0, 0.0))
+    mag = mag2 ** 0.5
+    return Quaternion((q.w / mag, q.x / mag, q.y / mag, q.z / mag))
+
+
+def rot3_orthonormalized(m3: Matrix) -> Matrix:
+    r = m3.copy()
+    r.normalize()
+    return r
+
+
+def remove_twist_from_quat(q: Quaternion, twist_axis_world: Vector) -> Quaternion:
+    qn = quat_normalized_safe(q)
+    axis = twist_axis_world.normalized()
+    v = Vector((qn.x, qn.y, qn.z))
+    proj = axis * v.dot(axis)
+    twist = Quaternion((qn.w, proj.x, proj.y, proj.z))
+    twist = quat_normalized_safe(twist)
+    swing = qn @ twist.inverted()
+    return quat_normalized_safe(swing)
+
+
+def get_bone_depth(arm_obj, bone_name):
+    bone = arm_obj.data.bones.get(bone_name)
+    d = 0
+    while bone and bone.parent:
+        d += 1
+        bone = bone.parent
+    return d
+
+
+def get_rest_world_matrix(arm_obj, bone_name) -> Matrix:
+    return arm_obj.matrix_world @ arm_obj.data.bones[bone_name].matrix_local
+
+
+def get_pose_world_matrix(arm_obj, bone_name) -> Matrix:
+    return arm_obj.matrix_world @ arm_obj.pose.bones[bone_name].matrix
+
+
+def build_bone_map(
+    source_obj: Object,
+    target_obj: Object,
+    base_bone_map: "dict[str, str]",
+    auto_map_same_names: bool = False,
+) -> "dict[str, str]":
+    bone_map = dict(base_bone_map)
+
+    if auto_map_same_names:
+        src_names = set(source_obj.pose.bones.keys())
+        tgt_names = set(target_obj.pose.bones.keys())
+        for name in sorted(src_names & tgt_names):
+            if name not in bone_map:
+                bone_map[name] = name
+
+    valid = {}
+    for tgt_name, src_name in bone_map.items():
+        if source_obj.pose.bones.get(src_name) and target_obj.pose.bones.get(tgt_name):
+            valid[tgt_name] = src_name
+        else:
+            print(f"[WARN] Skipping invalid bone map: target '{tgt_name}' <- source '{src_name}'")
+    return valid
+
+
+def get_source_delta_world(source_obj, source_bone_name):
+    src_rest_w = get_rest_world_matrix(source_obj, source_bone_name)
+    src_pose_w = get_pose_world_matrix(source_obj, source_bone_name)
+    return src_pose_w @ src_rest_w.inverted()
+
+
+def build_desired_target_pose_matrix_objspace(
+    source_obj: Object,
+    target_obj: Object,
+    source_bone_name: str,
+    target_bone_name: str,
+    *,
+    allow_translation: bool = False,
+    translation_source_bone_name: str | None = None,
+    ignore_twist: bool = False,
+    bone_axis_local: Vector | None = None,
+) -> Matrix:
+    """
+    Builds desired PoseBone.matrix in target ARMATURE OBJECT SPACE.
+    - Root: translation + rotation
+    - Non-root: rotation only
+    """
+    if bone_axis_local is None:
+        bone_axis_local = Vector((0.0, 1.0, 0.0))
+
+    # ---------------- Rotation source (normal mapped source bone)
+    src_delta_w = get_source_delta_world(source_obj, source_bone_name)
+    src_delta_world_r = rot3_orthonormalized(src_delta_w.to_3x3())
+
+    if ignore_twist:
+        src_bone = source_obj.data.bones[source_bone_name]
+        src_rest_rot_w = (source_obj.matrix_world @ src_bone.matrix_local).to_3x3()
+        src_rest_rot_w = rot3_orthonormalized(src_rest_rot_w)
+        twist_axis_w = (src_rest_rot_w @ bone_axis_local).normalized()
+
+        dq = src_delta_world_r.to_quaternion()
+        dq = remove_twist_from_quat(dq, twist_axis_w)
+        src_delta_world_r = rot3_orthonormalized(dq.to_matrix())
+
+    tgt_rest_w = get_rest_world_matrix(target_obj, target_bone_name)
+    tgt_rest_world_r = rot3_orthonormalized(tgt_rest_w.to_3x3())
+
+    tgt_desired_world_r = src_delta_world_r @ tgt_rest_world_r
+    tgt_desired_world_r = rot3_orthonormalized(tgt_desired_world_r)
+
+    arm_world_r = rot3_orthonormalized(target_obj.matrix_world.to_3x3())
+    tgt_desired_obj_r = arm_world_r.inverted() @ tgt_desired_world_r
+    tgt_desired_obj_r = rot3_orthonormalized(tgt_desired_obj_r)
+
+    tgt_pb = target_obj.pose.bones[target_bone_name]
+    cur_obj_pose = tgt_pb.matrix.copy()
+
+    # ---------------- Translation source (separate configurable source for root)
+    if allow_translation:
+        if translation_source_bone_name is None:
+            translation_source_bone_name = source_bone_name
+
+        src_delta_w_for_translation = get_source_delta_world(source_obj, translation_source_bone_name)
+
+        tgt_desired_world_full = src_delta_w_for_translation @ tgt_rest_w
+        tgt_desired_obj_full = target_obj.matrix_world.inverted() @ tgt_desired_world_full
+        loc = tgt_desired_obj_full.to_translation()
+    else:
+        loc = cur_obj_pose.to_translation()
+
+    return Matrix.LocRotScale(
+        loc,
+        tgt_desired_obj_r.to_quaternion(),
+        Vector((1.0, 1.0, 1.0)),
+    )
+
+
+def clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_root_target):
+    """Remove old F-curves for mapped bones (and translation root target)."""
+    ad = target_obj.animation_data
+    if not ad or not ad.action:
+        return
+
+    action = ad.action
+    mapped = set(bone_map.keys())
+    mapped.add(translation_root_target)
+
+    to_remove = []
+
+    for fc in action.fcurves:
+        dp = fc.data_path
+        for b in mapped:
+            prefix = f'pose.bones["{b}"].'
+            if dp.startswith(prefix) and (
+                dp.endswith("location") or
+                dp.endswith("rotation_quaternion") or
+                dp.endswith("scale")
+            ):
+                to_remove.append(fc)
+                break
+
+    for fc in to_remove:
+        action.fcurves.remove(fc)
+
+    if to_remove:
+        print(f"[INFO] Removed {len(to_remove)} existing F-curves for mapped/translation-root bones.")
+
+
+def clear_target_pose_for_frame(target_obj, bone_map):
+    """
+    Reset channels each frame.
+    All mapped bones get zero loc / identity rot / unit scale first.
+    """
+    for tgt_name in bone_map.keys():
+        pb = target_obj.pose.bones[tgt_name]
+        pb.rotation_mode = 'QUATERNION'
+        pb.rotation_quaternion = Quaternion((1.0, 0.0, 0.0, 0.0))
+        pb.scale = Vector((1.0, 1.0, 1.0))
+        pb.location = Vector((0.0, 0.0, 0.0))
+    bpy.context.view_layer.update()
+
+
+def retarget_frame(
+    source_obj: Object,
+    target_obj: Object,
+    bone_map: "dict[str, str]",
+    translation_root_target: str,
+    translation_root_source: str,
+    *,
+    ignore_twist: bool = False,
+    bone_axis_local: Vector | None = None,
+) -> None:
+    sorted_target_bones = sorted(bone_map.keys(), key=lambda n: get_bone_depth(target_obj, n))
+
+    clear_target_pose_for_frame(target_obj, bone_map)
+
+    for tgt_name in sorted_target_bones:
+        src_name = bone_map[tgt_name]
+        pb = target_obj.pose.bones[tgt_name]
+
+        allow_translation = (tgt_name == translation_root_target)
+
+        desired_obj_pose = build_desired_target_pose_matrix_objspace(
+            source_obj=source_obj,
+            target_obj=target_obj,
+            source_bone_name=src_name,
+            target_bone_name=tgt_name,
+            allow_translation=allow_translation,
+            translation_source_bone_name=(translation_root_source if allow_translation else None),
+            ignore_twist=ignore_twist,
+            bone_axis_local=bone_axis_local,
+        )
+
+        pb.matrix = desired_obj_pose
+        pb.scale = Vector((1.0, 1.0, 1.0))
+
+        if not allow_translation:
+            pb.location = Vector((0.0, 0.0, 0.0))
+
+        bpy.context.view_layer.update()
+
+
+# ============================================================
+# MODAL OPERATOR (responsive UI, ESC cancel)
+# ============================================================
+
+class WM_OT_modal_retarget_motion(bpy.types.Operator):
+    bl_idname = "wm.modal_retarget_motion"
+    bl_label = "Modal Retarget Motion"
+    bl_description = "Retarget animation without freezing Blender UI (ESC to cancel)"
+    bl_options = {'REGISTER'}
+
+    _timer = None
+    _state = None
+
+    def _cleanup(self, context):
+        wm = context.window_manager
+        if self._timer is not None:
+            wm.event_timer_remove(self._timer)
+            self._timer = None
+        try:
+            wm.progress_end()
+        except Exception:
+            pass
+        if context.area:
+            context.area.tag_redraw()
+
+    def _fail(self, context, msg):
+        self.report({'ERROR'}, msg)
+        print("[ERROR]", msg)
+        self._cleanup(context)
+        return {'CANCELLED'}
+
+    def invoke(self, context: Any, event: Any) -> Any:
+        cfg = get_retarget_config()
+        if cfg is None:
+            return self._fail(
+                context,
+                "No retarget config. Call set_retarget_config(RetargetConfig(...)) before invoking.",
+            )
+
+        source_obj = bpy.data.objects.get(cfg.source_armature_name)
+        target_obj = bpy.data.objects.get(cfg.target_armature_name)
+
+        if source_obj is None or target_obj is None:
+            return self._fail(context, "Could not find source/target armature objects.")
+        if source_obj.type != 'ARMATURE' or target_obj.type != 'ARMATURE':
+            return self._fail(context, "Source/target objects must be ARMATUREs.")
+
+        bone_map = build_bone_map(
+            source_obj,
+            target_obj,
+            cfg.bone_map,
+            cfg.auto_map_same_names,
+        )
+        if not bone_map:
+            return self._fail(context, "No valid bone mappings found.")
+
+        if cfg.translation_root_target not in bone_map:
+            return self._fail(
+                context,
+                f'TRANSLATION_ROOT_TARGET "{cfg.translation_root_target}" must be in BONE_MAP target names.',
+            )
+        if source_obj.pose.bones.get(cfg.translation_root_source) is None:
+            return self._fail(
+                context,
+                f'TRANSLATION_ROOT_SOURCE "{cfg.translation_root_source}" not found in source armature.',
+            )
+
+        scene = context.scene
+        frame_start = scene.frame_start if cfg.use_scene_frame_range else cfg.frame_start
+        frame_end = scene.frame_end if cfg.use_scene_frame_range else cfg.frame_end
+
+        if cfg.clear_existing_keys:
+            clear_existing_keyframes_for_mapped_bones(
+                target_obj, bone_map, cfg.translation_root_target
+            )
+
+        self._state = {
+            "source_obj": source_obj,
+            "target_obj": target_obj,
+            "bone_map": bone_map,
+            "translation_root_target": cfg.translation_root_target,
+            "translation_root_source": cfg.translation_root_source,
+            "frame_start": frame_start,
+            "frame_end": frame_end,
+            "frame": frame_start,
+            "cancelled": False,
+            "insert_keyframes": cfg.insert_keyframes,
+            "ignore_twist": cfg.ignore_twist,
+            "bone_axis_local": cfg.bone_axis_local,
+            "frames_per_tick": cfg.frames_per_tick,
+        }
+
+        print(f"[INFO] Translation source bone: {cfg.translation_root_source}")
+        print(f"[INFO] Translation target bone: {cfg.translation_root_target}")
+        print(f"[INFO] Retargeting frames {frame_start}..{frame_end}")
+        print(f"[INFO] Bone count: {len(bone_map)}")
+        print("[INFO] Modal retarget started. Press ESC to cancel.")
+
+        wm = context.window_manager
+        wm.progress_begin(frame_start, frame_end + 1)
+
+        self._timer = wm.event_timer_add(cfg.timer_step_sec, window=context.window)
+        wm.modal_handler_add(self)
+
+        if context.area:
+            context.area.tag_redraw()
+
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if self._state is None:
+            return self._fail(context, "Internal state missing.")
+
+        # Allow user cancel
+        if event.type in {'ESC'}:
+            self._state["cancelled"] = True
+            print("[INFO] Retarget cancelled by user.")
+            self.report({'WARNING'}, "Retarget cancelled.")
+            self._cleanup(context)
+            return {'CANCELLED'}
+
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+
+        st = self._state
+        scene = context.scene
+
+        try:
+            frames_per_tick = st.get("frames_per_tick", 1)
+            insert_keyframes = st.get("insert_keyframes", True)
+            ignore_twist = st.get("ignore_twist", False)
+            bone_axis_local = st.get("bone_axis_local")
+
+            for _ in range(max(1, frames_per_tick)):
+                f = st["frame"]
+                if f > st["frame_end"]:
+                    print("[INFO] Retargeting complete.")
+                    self.report({'INFO'}, "Retarget complete.")
+                    self._cleanup(context)
+                    return {'FINISHED'}
+
+                scene.frame_set(f)
+                bpy.context.view_layer.update()
+
+                retarget_frame(
+                    source_obj=st["source_obj"],
+                    target_obj=st["target_obj"],
+                    bone_map=st["bone_map"],
+                    translation_root_target=st["translation_root_target"],
+                    translation_root_source=st["translation_root_source"],
+                    ignore_twist=ignore_twist,
+                    bone_axis_local=bone_axis_local,
+                )
+
+                if insert_keyframes:
+                    for tgt_name in st["bone_map"].keys():
+                        pb = st["target_obj"].pose.bones[tgt_name]
+                        pb.keyframe_insert(data_path="rotation_quaternion", frame=f)
+                        pb.keyframe_insert(data_path="scale", frame=f)
+                        pb.keyframe_insert(data_path="location", frame=f)
+
+                context.window_manager.progress_update(f)
+
+                if f % 10 == 0:
+                    print(f"[INFO] frame {f}/{st['frame_end']}")
+
+                st["frame"] += 1
+
+            # Request viewport / UI redraw
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    area.tag_redraw()
+
+            return {'RUNNING_MODAL'}
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return self._fail(context, f"Retarget error: {e}")
 
 
 def load_replay(skeleton_tree: dict, armature: Object, data_path: str):
