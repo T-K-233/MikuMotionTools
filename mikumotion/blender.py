@@ -160,17 +160,16 @@ def set_bones_to_1d_rotation(armature: Object) -> None:
 def build_body_motion_data(
     armature: Object,
     bone_names: list[str],
-    scaling_ratio: float = 1.0,
 ) -> MotionSequence:
     """
     Build rigid body motion data from the source armature.
-    The dof motion data is not included in this function, which will be initialized
-    as a properly-dimensioned zero array.
+    The joint motion data is not included in this function, and will be initialized
+    as a properly-dimensioned zero array. The joint motion data will be populated during the
+    IK retargeting phase of the pipeline.
 
     Args:
         armature: The source armature object.
         bone_names: The list of bone names to extract.
-        scaling_ratio: The scaling ratio of the armature.
 
     Returns:
         A MotionSequence object containing the motion data.
@@ -185,7 +184,7 @@ def build_body_motion_data(
 
     motion = MotionSequence(
         num_frames=n_frames,
-        dof_names=[],
+        joint_names=[],
         body_names=bone_names,
         fps=fps_float,
     )
@@ -228,10 +227,6 @@ def build_body_motion_data(
     offset_y = np.mean(motion._body_positions[0, :, 1])
     motion._body_positions[:, :, 0] -= offset_x
     motion._body_positions[:, :, 1] -= offset_y
-
-    # in Blender, scaling the armature does not scale the retreived bone position, so we need to
-    # manually apply the scaling to the sampled data here.
-    motion._body_positions[:] *= scaling_ratio
 
     # calculate velocities
     motion._body_linear_velocities[1:] = np.diff(motion._body_positions, axis=0) / (1. / fps_float)

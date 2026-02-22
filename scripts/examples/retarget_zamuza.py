@@ -2,7 +2,7 @@
 Retarget motion from Miku source armature to Zamuza target armature.
 
 Usage:
-    blender ./blender-projects/test.blend --python ./scripts/examples/retarget_zamuza.py
+    blender ./blender-projects/zamuza.blend --python ./scripts/examples/retarget_zamuza.py
 """
 
 import os

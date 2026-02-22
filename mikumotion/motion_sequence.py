@@ -1,6 +1,3 @@
-# Modified from Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# SPDX-License-Identifier: BSD-3-Clause
-
 import os
 
 import numpy as np
@@ -10,9 +7,16 @@ class MotionSequence:
     """
     A sequence of motion data.
 
-    Modified from https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab_tasks/isaaclab_tasks/direct/humanoid_amp/motions/motion_loader.py.
+    Modified from Isaac Lab's motion_loader.py:
+    https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab_tasks/isaaclab_tasks/direct/humanoid_amp/motions/motion_loader.py
 
-    This class is modified to use numpy instead of torch to load the motion data, suitable for CPU-only environment.
+    Original work:
+    Copyright (c) 2022-2026, The Isaac Lab Project Developers
+    (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+    SPDX-License-Identifier: BSD-3-Clause
+
+    This class is modified to use numpy instead of torch to load the motion data,
+    suitable for CPU-only environment.
     """
 
     @classmethod
@@ -28,17 +32,17 @@ class MotionSequence:
         assert os.path.isfile(path), f"Invalid file path: {path}"
         data = np.load(path)
 
-        num_frames = np.max([data["dof_positions"].shape[0], data["body_positions"].shape[0]])
+        num_frames = np.max([data["joint_positions"].shape[0], data["body_positions"].shape[0]])
 
         motion = cls(
             num_frames=num_frames,
-            dof_names=data["dof_names"].tolist(),
+            joint_names=data["joint_names"].tolist(),
             body_names=data["body_names"].tolist(),
             fps=data["fps"],
         )
 
-        motion._dof_positions[:] = data["dof_positions"]     # joint positions, rad
-        motion._dof_velocities[:] = data["dof_velocities"]   # joint velocities, rad/s
+        motion._joint_positions[:] = data["joint_positions"]   # joint positions, rad
+        motion._joint_velocities[:] = data["joint_velocities"]   # joint velocities, rad/s
         motion._body_positions[:] = data["body_positions"]   # link positions, m
         motion._body_rotations[:] = data["body_rotations"]   # link rotations, (qw, qx, qy, qz) quaternion
         motion._body_linear_velocities[:] = data["body_linear_velocities"]       # link linear velocities, m/s
@@ -48,12 +52,12 @@ class MotionSequence:
 
         return motion
 
-    def __init__(self, num_frames: int, dof_names: list[str], body_names: list[str], fps: int = 50) -> None:
+    def __init__(self, num_frames: int, joint_names: list[str], body_names: list[str], fps: int = 50) -> None:
         """Initialize a MotionSequence object.
 
         Args:
             num_frames: Number of frames.
-            dof_names: List of joint names.
+            joint_names: List of joint names.
             body_names: List of rigid body names.
             fps: the FPS of the motion data.
         """
@@ -61,13 +65,13 @@ class MotionSequence:
         self._dt = 1.0 / self._fps                              # per frame time step, s
         self._num_frames = num_frames                           # total number of frames
         self._duration = self._dt * (self._num_frames - 1)      # duration, s
-        self._dof_names = dof_names                             # joint names
+        self._joint_names = joint_names                         # joint names
         self._body_names = body_names                           # rigid body names
 
         # joint positions, rad
-        self._dof_positions = np.zeros((self._num_frames, len(self._dof_names)), dtype=np.float32)
+        self._joint_positions = np.zeros((self._num_frames, len(self._joint_names)), dtype=np.float32)
         # joint velocities, rad/s
-        self._dof_velocities = np.zeros((self._num_frames, len(self._dof_names)), dtype=np.float32)
+        self._joint_velocities = np.zeros((self._num_frames, len(self._joint_names)), dtype=np.float32)
         # link positions, m
         self._body_positions = np.zeros((self._num_frames, len(self._body_names), 3), dtype=np.float32)
         # link rotations, (qw, qx, qy, qz) quaternion
@@ -101,9 +105,9 @@ class MotionSequence:
         return self._duration
 
     @property
-    def dof_names(self) -> list[str]:
+    def joint_names(self) -> list[str]:
         """Joint names."""
-        return self._dof_names
+        return self._joint_names
 
     @property
     def body_names(self) -> list[str]:
@@ -111,9 +115,9 @@ class MotionSequence:
         return self._body_names
 
     @property
-    def num_dofs(self) -> int:
+    def num_joints(self) -> int:
         """Number of joints."""
-        return len(self._dof_names)
+        return len(self._joint_names)
 
     @property
     def num_bodies(self) -> int:
@@ -121,14 +125,14 @@ class MotionSequence:
         return len(self._body_names)
 
     @property
-    def dof_positions(self) -> np.ndarray:
+    def joint_positions(self) -> np.ndarray:
         """Joint positions."""
-        return self._dof_positions
+        return self._joint_positions
 
     @property
-    def dof_velocities(self) -> np.ndarray:
+    def joint_velocities(self) -> np.ndarray:
         """Joint velocities."""
-        return self._dof_velocities
+        return self._joint_velocities
 
     @property
     def body_positions(self) -> np.ndarray:
@@ -150,11 +154,11 @@ class MotionSequence:
         """Rigid body angular velocities."""
         return self._body_angular_velocities
 
-    def get_dof_indices(self, dof_names: list[str]) -> list[int]:
+    def get_joint_indices(self, joint_names: list[str]) -> list[int]:
         """Get joint indexes by joint names.
 
         Args:
-            dof_names: List of joint names.
+            joint_names: List of joint names.
 
         Raises:
             AssertionError: If the specified joint name doesn't exist.
@@ -163,9 +167,9 @@ class MotionSequence:
             List of joint indexes.
         """
         indexes = []
-        for name in dof_names:
-            assert name in self._dof_names, f"The specified joint name ({name}) doesn't exist in {self._dof_names}"
-            indexes.append(self._dof_names.index(name))
+        for name in joint_names:
+            assert name in self._joint_names, f"The specified joint name ({name}) doesn't exist in {self._joint_names}"
+            indexes.append(self._joint_names.index(name))
         return indexes
 
     def get_body_indices(self, body_names: list[str]) -> list[int]:
@@ -205,8 +209,8 @@ class MotionSequence:
         frames = np.clip(frames, 0, self._num_frames - 1)
 
         return (
-            self._dof_positions[frames],
-            self._dof_velocities[frames],
+            self._joint_positions[frames],
+            self._joint_velocities[frames],
             self._body_positions[frames],
             self._body_rotations[frames],
             self._body_linear_velocities[frames],
@@ -220,15 +224,15 @@ class MotionSequence:
             path: The path to the output file.
         """
         fps = np.array([self._fps], dtype=np.int64)  # this needs to be int64
-        dof_names = np.array(self._dof_names)
+        joint_names = np.array(self._joint_names)
         body_names = np.array(self._body_names)
 
         np.savez(path,
             fps=fps,
-            dof_names=dof_names,
+            joint_names=joint_names,
             body_names=body_names,
-            dof_positions=self._dof_positions,
-            dof_velocities=self._dof_velocities,
+            joint_positions=self._joint_positions,
+            joint_velocities=self._joint_velocities,
             body_positions=self._body_positions,
             body_rotations=self._body_rotations,
             body_linear_velocities=self._body_linear_velocities,
@@ -252,14 +256,14 @@ def rotate_motion(motion: MotionSequence, z_rotation: float) -> MotionSequence:
     # Create a new motion sequence with the same structure
     rotated_motion = MotionSequence(
         num_frames=motion.num_frames,
-        dof_names=motion.dof_names,
+        joint_names=motion.joint_names,
         body_names=motion.body_names,
         fps=motion.fps
     )
 
     # Copy DOF data (joint angles don't need rotation)
-    rotated_motion._dof_positions[:] = motion._dof_positions
-    rotated_motion._dof_velocities[:] = motion._dof_velocities
+    rotated_motion._joint_positions[:] = motion._joint_positions
+    rotated_motion._joint_velocities[:] = motion._joint_velocities
 
     # Create rotation quaternion for z-rotation
     # Using ZYX convention: roll=0, pitch=0, yaw=z_rotation
@@ -341,13 +345,12 @@ def translate_motion(motion: MotionSequence, translation: np.ndarray) -> MotionS
     """
     translated_motion = MotionSequence(
         num_frames=motion.num_frames,
-        dof_names=motion.dof_names,
+        joint_names=motion.joint_names,
         body_names=motion.body_names,
         fps=motion.fps
     )
-    translated_motion._dof_positions = motion._dof_positions
-    translated_motion._dof_velocities = motion._dof_velocities
-    translated_motion._dof_velocities = motion._dof_velocities
+    translated_motion._joint_positions = motion._joint_positions
+    translated_motion._joint_velocities = motion._joint_velocities
     translated_motion._body_positions = motion._body_positions + translation
     translated_motion._body_rotations = motion._body_rotations
     translated_motion._body_linear_velocities = motion._body_linear_velocities
@@ -365,5 +368,5 @@ if __name__ == "__main__":
     motion = MotionSequence(args.file)
 
     print("- number of frames:", motion.num_frames)
-    print("- number of DOFs:", motion.num_dofs)
+    print("- number of joints:", motion.num_joints)
     print("- number of bodies:", motion.num_bodies)

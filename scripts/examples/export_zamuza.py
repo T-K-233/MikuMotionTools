@@ -55,7 +55,6 @@ from mikumotion.blender import (
     set_armature_to_rest,
     set_scene_animation_range,
 )
-from mikumotion.motion_sequence import rotate_motion
 
 C = bpy.context
 D = bpy.data
@@ -64,47 +63,42 @@ O = bpy.ops
 
 assert C.scene.render.fps == 50, f"Detected FPS is {C.scene.render.fps}, expected to be 50"
 
-armature = D.objects.get("YYB式初音ミクv1.02_arm")
+armature = D.objects.get("Armature")
+
 
 # we need data from these bones to match SMPL keypoints
 bone_names = [
-   "下半身",      # 0
-   "足.L",        # 1
-   "足.R",        # 2
-   "上半身",      # 3
-   "ひざ.L",      # 4
-   "ひざ.R",      # 5
-   "上半身2",     # 6, 9
-   "足首.L",      # 7
-   "足首.R",      # 8
-   "足先EX.L",    # 10
-   "足先EX.R",    # 11
-   "首",          # 12
-   "肩.L",        # 13
-   "肩.R",        # 14
-   "頭",          # 15
-   "腕.L",        # 16
-   "腕.R",        # 17
-   "ひじ.L",      # 18
-   "ひじ.R",      # 19
-   "手首.L",      # 20, 22
-   "手首.R",      # 21, 23
+    "pelvis",           # 0
+    "left_upper_leg",   # 1
+    "right_upper_leg",  # 2
+    "torso",            # 3
+    "left_lower_leg",   # 4
+    "right_lower_leg",  # 5
+    "torso",            # 6
+    "left_foot",        # 7
+    "right_foot",       # 8
+    "head",             # 9
+    "left_upper_arm",   # 10
+    "right_upper_arm",  # 11
+    "left_lower_arm",   # 12
+    "right_lower_arm",  # 13
+    "left_hand",        # 14
+    "right_hand",       # 15
 ]
 
-scaling_ratio = 0.85
 
-# blender is +Y forward, we need to rotate to +X forward
-rotate_z_angle = np.pi / 2
+# # blender is +Y forward, we need to rotate to +X forward
+# rotate_z_angle = 0
 
 
 def export_reset_pose():
     set_scene_animation_range(0, 1)
     set_armature_to_rest(armature)
 
-    motion = build_body_motion_data(armature, bone_names, scaling_ratio=scaling_ratio)
+    motion = build_body_motion_data(armature, bone_names)
 
     # blender is +Y forward, we need to rotate to +X forward
-    motion = rotate_motion(motion, rotate_z_angle)
+    # motion = rotate_motion(motion, rotate_z_angle)
 
     save_path = "./data/motions/zamuza_reset.npz"
     motion.save(save_path)
@@ -112,13 +106,13 @@ def export_reset_pose():
 
 
 def export_motion():
-    motion_section = (0, 1632)
+    motion_section = (0, 400)
     set_scene_animation_range(motion_section[0], motion_section[1])
 
     set_armature_to_pose(armature)
 
-    motion = build_body_motion_data(armature, bone_names, scaling_ratio=scaling_ratio)
-    motion = rotate_motion(motion, rotate_z_angle)
+    motion = build_body_motion_data(armature, bone_names)
+    # motion = rotate_motion(motion, rotate_z_angle)
 
     save_path = f"./data/motions/zamuza_{motion_section[0]}_{motion_section[1]}.npz"
     motion.save(save_path)
