@@ -161,6 +161,7 @@ def set_bones_to_1d_rotation(armature: Object) -> None:
 def build_body_motion_data(
     armature: Object,
     bone_names: list[str],
+    blender_bone_postfix: str = ".frame",
 ) -> MotionSequence:
     """
     Build rigid body motion data from the source armature.
@@ -205,9 +206,10 @@ def build_body_motion_data(
         # read bone positions
         for idx, bone_name in enumerate(motion.body_names):
 
-            source_bone: PoseBone = armature.pose.bones.get(bone_name)
+            blender_bone_name = bone_name + blender_bone_postfix
+            source_bone: PoseBone = armature.pose.bones.get(blender_bone_name)
             if not source_bone:
-                print(f"WARNING: cannot find source bone {bone_name}")
+                print(f"WARNING: cannot find source bone {blender_bone_name}")
                 continue
 
             # bone position is defined by the head

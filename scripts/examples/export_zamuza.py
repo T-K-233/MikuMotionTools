@@ -106,7 +106,7 @@ def export_reset_pose():
 
 
 def export_motion():
-    motion_section = (0, 400)
+    motion_section = (0, 2000)
     set_scene_animation_range(motion_section[0], motion_section[1])
 
     set_armature_to_pose(armature)
