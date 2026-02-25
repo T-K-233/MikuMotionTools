@@ -1,6 +1,6 @@
 [project]
 name = "mikumotion"
-version = "2025.07.25"
+version = "2026.02.22"
 readme = "README.md"
 authors = [
     {name = "-T.K.-", email = "tk233.xyz@gmail.com"},
