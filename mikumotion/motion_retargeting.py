@@ -214,46 +214,45 @@ class MotionRetargeting:
         if realtime:
             self.rate = RateLimiter(frequency=self.fps / 4, warn=False)
 
-        while True:
-            for frame_idx in range(self.num_frames):
-                # update task targets
-                for body_name, target_body_name in self.retargeted_bodies.items():
-                    # TODO: might be better to optimize the following logic with numpy vectorization
-                    source_body_index = self.source_motion.get_body_indices([body_name])[0]
+        for frame_idx in range(self.num_frames):
+            # update task targets
+            for body_name, target_body_name in self.retargeted_bodies.items():
+                # TODO: might be better to optimize the following logic with numpy vectorization
+                source_body_index = self.source_motion.get_body_indices([body_name])[0]
 
-                    source_position = self.source_motion.body_positions[frame_idx, source_body_index].copy()
+                source_position = self.source_motion.body_positions[frame_idx, source_body_index].copy()
 
-                    # get the position offset in (x, y, z) in meters
-                    source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index].copy()
+                # get the position offset in (x, y, z) in meters
+                source_orientation = self.source_motion.body_rotations[frame_idx, source_body_index].copy()
 
-                    self.frame_tasks[target_body_name].set_target(mink.SE3(
-                        wxyz_xyz=np.concatenate([source_orientation, source_position])
-                    ))
+                self.frame_tasks[target_body_name].set_target(mink.SE3(
+                    wxyz_xyz=np.concatenate([source_orientation, source_position])
+                ))
 
-                    # move the frame mocap body to the current body pose
-                    mink.move_mocap_to_frame(self.model, self.data, f"current_{body_name}_frame", body_name, "body")
-                    # move the target frame mocap body to the target pose
-                    mocap_id = self.model.body(f"target_{body_name}_frame").mocapid[0]
-                    self.data.mocap_pos[mocap_id] = source_position
-                    self.data.mocap_quat[mocap_id] = source_orientation
+                # move the frame mocap body to the current body pose
+                mink.move_mocap_to_frame(self.model, self.data, f"current_{body_name}_frame", body_name, "body")
+                # move the target frame mocap body to the target pose
+                mocap_id = self.model.body(f"target_{body_name}_frame").mocapid[0]
+                self.data.mocap_pos[mocap_id] = source_position
+                self.data.mocap_quat[mocap_id] = source_orientation
 
-                prev_error = self.calculate_error()
-                num_iter = 0
+            prev_error = self.calculate_error()
+            num_iter = 0
 
+            error = self.solve_ik()
+            while prev_error - error > 0.0001:
+                if num_iter >= self.max_iter:
+                    print(f"Maximum number of iterations reached for frame {frame_idx}")
+                    break
+                prev_error = error
                 error = self.solve_ik()
-                while prev_error - error > 0.0001:
-                    if num_iter >= self.max_iter:
-                        print(f"Maximum number of iterations reached for frame {frame_idx}")
-                        break
-                    prev_error = error
-                    error = self.solve_ik()
-                    num_iter += 1
+                num_iter += 1
 
-                # forward kinematics to update body positions and orientations
-                mujoco.mj_forward(self.model, self.data)
+            # forward kinematics to update body positions and orientations
+            mujoco.mj_forward(self.model, self.data)
 
-                # store the joint motion data
-                self.target_motion._joint_positions[frame_idx, :] = self.data.qpos[7:]
+            # store the joint motion data
+            self.target_motion._joint_positions[frame_idx, :] = self.data.qpos[7:]
 
             # extract body data from the MuJoCo robot after IK solving
             for i, body_name in enumerate(self.retargeted_bodies):
@@ -271,10 +270,10 @@ class MotionRetargeting:
                 self.target_motion._body_linear_velocities[frame_idx, i, :] = velocity[3:6]
                 self.target_motion._body_angular_velocities[frame_idx, i, :] = velocity[0:3]
 
-                # visualize at fixed FPS
-                self.viewer.sync()
-                if realtime:
-                    self.rate.sleep()
+            # visualize at fixed FPS
+            self.viewer.sync()
+            if realtime:
+                self.rate.sleep()
 
         # compute the velocities
         self.target_motion._joint_velocities[1:] = np.diff(self.target_motion._joint_positions, axis=0) / (1. / self.fps)
