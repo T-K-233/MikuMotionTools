@@ -3,7 +3,7 @@ import numpy as np
 import mink
 import mujoco
 import mujoco.viewer
-
+from tqdm import tqdm
 
 from mikumotion.motion_sequence import MotionSequence
 from mikumotion.mujoco_utils import add_body_frames
@@ -214,7 +214,7 @@ class MotionRetargeting:
         if realtime:
             self.rate = RateLimiter(frequency=self.fps / 4, warn=False)
 
-        for frame_idx in range(self.num_frames):
+        for frame_idx in tqdm(range(self.num_frames)):
             # update task targets
             for body_name, target_body_name in self.retargeted_bodies.items():
                 # TODO: might be better to optimize the following logic with numpy vectorization

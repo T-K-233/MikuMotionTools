@@ -10,6 +10,7 @@ dependencies = [
     "numpy",
     "mujoco",
     "mink",
+    "tqdm>=4.67.3",
 ]
 keywords = ["motion", "mmd", "blender"]
 classifiers = [
