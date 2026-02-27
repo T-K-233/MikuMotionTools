@@ -227,15 +227,18 @@ class MotionRetargeting:
             # extract body data from the MuJoCo robot after IK solving
             for i, body_name in enumerate(self.retargeted_bodies):
                 mapping_entry = self.mapping_table[body_name]
-                body_id = self.model.body(mapping_entry["target"]).id
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, mapping_entry["target"])
 
                 # body position and rotation in world frame
                 self.target_motion._body_positions[frame_idx, i, :] = self.data.xpos[body_id]
                 self.target_motion._body_rotations[frame_idx, i, :] = self.data.xquat[body_id]
 
                 # body linear and angular velocities in world frame
-                self.target_motion._body_linear_velocities[frame_idx, i, :] = self.data.cvel[body_id][3:6]
-                self.target_motion._body_angular_velocities[frame_idx, i, :] = self.data.cvel[body_id][0:3]
+                velocity = np.empty(6)
+                is_local = False
+                mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_XBODY, body_id, velocity, is_local)
+                self.target_motion._body_linear_velocities[frame_idx, i, :] = velocity[3:6]
+                self.target_motion._body_angular_velocities[frame_idx, i, :] = velocity[0:3]
 
             # visualize at fixed FPS
             self.viewer.sync()
