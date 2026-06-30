@@ -227,6 +227,24 @@ class ArmatureTree:
             np.array(local_rotations, dtype=np.float32),
         )
 
+    @classmethod
+    def from_urdf(cls, path: str) -> "ArmatureTree":
+        """
+        Parses a URDF file and returns an Armature Tree describing its link structure.
+
+        Each link becomes a body; its local translation and rotation are taken from
+        the parent joint's ``<origin>``. The root link (the one that is never a joint
+        child) becomes the tree root.
+
+        Args:
+            path: the path to the urdf file
+        Returns:
+            The armature tree constructed from the urdf file
+        """
+        from .urdf import RobotModel
+
+        return RobotModel.from_file(path).to_armature_tree()
+
 
 if __name__ == "__main__":
     xml_path = "/home/tk/Desktop/Pianist/source/pianist/data/robots/ude_better_dummy/mjcf/ude_dummy.xml"

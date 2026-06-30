@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import bpy
 from dataclasses import dataclass
@@ -8,6 +10,7 @@ from mathutils import Matrix, Quaternion, Vector
 
 
 from .armature_tree import ArmatureTree
+from .urdf import RobotModel, rpy_to_quat
 
 # ============================================================
 # RETARGET CONFIG
@@ -274,6 +277,12 @@ def build_armature(
         show_names: Whether to show the names of the bones on the armature.
         show_axes: Whether to show the axes of the bones on the armature.
     """
+    # ensure we start in OBJECT mode; the scene's active object may currently be in
+    # EDIT or POSE mode (e.g. another armature), which makes object operators fail with
+    # "context is incorrect".
+    if C.object is not None and C.object.mode != "OBJECT":
+        O.object.mode_set(mode="OBJECT")
+
     # delete the existing armature, if any
     armature = D.objects.get(name)
     if armature:
@@ -389,6 +398,206 @@ def bind_to_armature(skeleton_tree: dict):
 
         # restore world matrix to maintain global transform
         frame.matrix_world = matrix_world.copy()
+
+
+# ============================================================
+# URDF -> ARMATURE + MESH
+# ============================================================
+
+def armature_tree_world_transforms(tree: ArmatureTree) -> "dict[str, Matrix]":
+    """
+    Compute the world-space rest transform of every link frame in an ArmatureTree.
+
+    These are the link frames as defined by the URDF/MJCF (NOT the Blender bone
+    orientations, which point head->tail). They are used to place visual meshes at
+    their correct location and orientation. Assumes the armature object sits at the
+    world origin.
+
+    Args:
+        tree: The ArmatureTree.
+
+    Returns:
+        A dict mapping body name -> 4x4 world transform Matrix.
+    """
+    global_transforms: list[Matrix] = []
+    parent_indices = tree.body_parent_indices
+
+    for body_index in range(tree.num_bodies):
+        parent_index = parent_indices[body_index]
+        local_transform = matrix_from_translation_rotation(
+            tree.local_translations[body_index],
+            tree.local_rotations[body_index],
+        )
+        if parent_index == -1:
+            global_transforms.append(local_transform)
+        else:
+            global_transforms.append(global_transforms[parent_index] @ local_transform)
+
+    return {tree.body_names[i]: global_transforms[i] for i in range(tree.num_bodies)}
+
+
+def import_stl(filepath: str, name: "str | None" = None) -> Object:
+    """
+    Import an STL mesh file and return the created object.
+
+    Uses the Blender 4.x importer (``wm.stl_import``), falling back to the legacy
+    ``import_mesh.stl`` operator on older Blender versions.
+
+    Args:
+        filepath: Path to the STL file.
+        name: Optional name to assign to the imported object and its mesh data.
+
+    Returns:
+        The imported mesh Object.
+    """
+    before = set(D.objects)
+    if hasattr(O.wm, "stl_import"):
+        O.wm.stl_import(filepath=filepath)
+    else:
+        O.import_mesh.stl(filepath=filepath)
+
+    new_objects = [obj for obj in D.objects if obj not in before]
+    if not new_objects:
+        raise RuntimeError(f"Failed to import STL: {filepath}")
+    obj = new_objects[0]
+
+    if name:
+        obj.name = name
+        if obj.data:
+            obj.data.name = name
+    return obj
+
+
+def get_or_create_material(name: str, rgba) -> "bpy.types.Material":
+    """
+    Get an existing material by name, or create a new one with the given color.
+
+    Args:
+        name: Material name.
+        rgba: An (r, g, b) or (r, g, b, a) color, or None.
+
+    Returns:
+        The material.
+    """
+    mat = D.materials.get(name)
+    if mat is not None:
+        return mat
+
+    mat = D.materials.new(name)
+    mat.use_nodes = True
+    if rgba is not None:
+        r, g, b = float(rgba[0]), float(rgba[1]), float(rgba[2])
+        a = float(rgba[3]) if len(rgba) > 3 else 1.0
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf is not None:
+            bsdf.inputs["Base Color"].default_value = (r, g, b, a)
+        # viewport display color (Solid shading)
+        mat.diffuse_color = (r, g, b, a)
+    return mat
+
+
+def parent_object_to_bone(obj: Object, armature: Object, bone_name: str) -> None:
+    """
+    Parent an object to an armature bone while preserving its world transform.
+
+    Mirrors the behaviour of the GUI "Keep Transform" parenting option.
+
+    Args:
+        obj: The object to parent.
+        armature: The armature object.
+        bone_name: The name of the bone to parent to.
+    """
+    matrix_world = obj.matrix_world.copy()
+    obj.parent = armature
+    obj.parent_bone = bone_name
+    obj.parent_type = "BONE"
+    obj.matrix_world = matrix_world
+
+
+def build_robot_from_urdf(
+    robot: RobotModel,
+    name: str = "robot",
+    with_meshes: bool = True,
+    default_length: float = 0.05,
+    show_names: bool = False,
+    show_axes: bool = True,
+) -> Object:
+    """
+    Build a Blender armature (one bone per link) and the visual meshes for a parsed URDF robot.
+
+    The armature contains one bone per URDF link, with bone heads placed at the link
+    origins (see ``build_armature``). Each link's visual mesh is imported, placed at the
+    link frame (offset by the visual's own ``<origin>``), given a material from its color,
+    and parented to the corresponding bone so it follows the bone during animation.
+
+    Note: the bone orientations point head->tail and do NOT match the URDF link frames.
+    Mesh placement therefore uses the independently-computed link world transforms
+    (``armature_tree_world_transforms``), and "Keep Transform" parenting keeps the mesh in
+    place regardless of bone orientation.
+
+    Args:
+        robot: The parsed RobotModel (see ``mikumotion.urdf.RobotModel.from_file``).
+        name: Name of the armature object.
+        with_meshes: Whether to import and attach the visual meshes.
+        default_length: Default bone length passed to ``build_armature``.
+        show_names: Whether to display bone names.
+        show_axes: Whether to display bone axes.
+
+    Returns:
+        The created armature Object.
+    """
+    tree = robot.to_armature_tree()
+    build_armature(
+        tree,
+        name=name,
+        default_length=default_length,
+        show_names=show_names,
+        show_axes=show_axes,
+    )
+    armature = D.objects.get(name)
+
+    # ensure the armature sits at the world origin so link world transforms == placement
+    armature.matrix_world = Matrix.Identity(4)
+
+    if not with_meshes:
+        return armature
+
+    world_tf = armature_tree_world_transforms(tree)
+
+    num_placed = 0
+    for link_name, link in robot.links.items():
+        if link_name not in world_tf:
+            print(f"WARNING: link {link_name} not found in armature, skipping its meshes")
+            continue
+        link_world = world_tf[link_name]
+
+        for vi, visual in enumerate(link.visuals):
+            if not visual.mesh_path:
+                continue
+            if not os.path.isfile(visual.mesh_path):
+                print(f"WARNING: mesh file not found for {link_name}: {visual.mesh_path}")
+                continue
+
+            obj_name = f"{link_name}_visual" if len(link.visuals) == 1 else f"{link_name}_visual_{vi}"
+            obj = import_stl(visual.mesh_path, name=obj_name)
+
+            visual_local = matrix_from_translation_rotation(
+                visual.origin_xyz,
+                rpy_to_quat(visual.origin_rpy),
+            )
+            scale_mat = Matrix.Diagonal(Vector(visual.scale)).to_4x4()
+            obj.matrix_world = link_world @ visual_local @ scale_mat
+
+            if visual.rgba is not None:
+                mat = get_or_create_material(visual.material_name or f"{link_name}_material", visual.rgba)
+                obj.data.materials.clear()
+                obj.data.materials.append(mat)
+
+            parent_object_to_bone(obj, armature, link_name)
+            num_placed += 1
+
+    print(f"Built robot '{name}': {tree.num_bodies} bones, {num_placed} visual meshes")
+    return armature
 
 
 # ============================================================
