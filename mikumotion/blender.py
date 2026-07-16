@@ -601,6 +601,111 @@ def build_robot_from_urdf(
 
 
 # ============================================================
+# MOTION -> ARMATURE (drive the faithful rig from a MotionSequence)
+# ============================================================
+
+def load_motion_to_armature(
+    motion: MotionSequence,
+    armature: Object,
+    tree: ArmatureTree,
+    *,
+    frame_start: int = 1,
+    frame_stride: int = 1,
+    set_scene_range: bool = True,
+) -> int:
+    """
+    Drive a faithful (one-bone-per-link) armature from a MotionSequence of per-link
+    world poses, inserting a keyframe per sampled frame.
+
+    Each link's Blender bone is posed so that its rigidly-parented visual mesh lands
+    exactly at that link's world pose from ``motion`` (``body_positions`` /
+    ``body_rotations``). This is *exact* — no ball-joint merging / approximation. The
+    pose is computed analytically as a per-bone ``matrix_basis`` from the world-space
+    deltas, so no per-bone ``view_layer.update()`` is needed (keeps long sequences fast).
+
+    The armature must sit at the world origin (as built by ``build_robot_from_urdf``)
+    and its bones must be named by link (matching ``motion.body_names`` / ``tree``).
+
+    Args:
+        motion: Source MotionSequence (body frames == URDF link frames).
+        armature: The faithful armature Object (visual meshes parented to its bones).
+        tree: The ArmatureTree the armature was built from (for rest link frames).
+        frame_start: Blender frame number that motion frame 0 maps to.
+        frame_stride: Sample every Nth motion frame (1 = every frame). Scene FPS is
+            scaled by ``1/stride`` so playback speed is preserved.
+        set_scene_range: If True, set the scene FPS + frame range from the motion.
+
+    Returns:
+        The number of keyframed frames.
+    """
+    assert armature.type == "ARMATURE", "target must be an armature"
+    # the world-pose math assumes the armature object is at the origin
+    armature.matrix_world = Matrix.Identity(4)
+
+    rest_world = armature_tree_world_transforms(tree)  # link name -> rest world Matrix
+
+    data_bones = armature.data.bones
+    drive_names = [n for n in motion.body_names if n in data_bones and n in rest_world]
+    missing = [n for n in motion.body_names if n not in data_bones]
+    if missing:
+        print(f"[motion] WARNING: {len(missing)} motion bodies have no matching bone (skipped): {missing[:6]}")
+
+    # cache per-bone rest matrix (armature space) + parent bone name; force quaternion mode
+    rest_bone: "dict[str, Matrix]" = {}
+    parent_name: "dict[str, str | None]" = {}
+    for name in drive_names:
+        b = data_bones[name]
+        rest_bone[name] = b.matrix_local.copy()
+        parent_name[name] = b.parent.name if b.parent else None
+        armature.pose.bones[name].rotation_mode = "QUATERNION"
+
+    body_index = {n: motion.body_names.index(n) for n in drive_names}
+    identity = Matrix.Identity(4)
+
+    motion_fps = int(np.asarray(motion.fps).reshape(-1)[0])
+    frames = list(range(0, motion.num_frames, max(1, frame_stride)))
+    if set_scene_range:
+        set_scene_fps(max(1, int(round(motion_fps / max(1, frame_stride)))))
+        set_scene_animation_range(frame_start, frame_start + len(frames) - 1)
+
+    for out_i, f in enumerate(frames):
+        bl_frame = frame_start + out_i
+
+        # 1) world-space delta of each driven link: delta = M_anim @ rest_link^-1
+        deltas: "dict[str, Matrix]" = {}
+        for name in drive_names:
+            idx = body_index[name]
+            m_anim = matrix_from_translation_rotation(
+                motion.body_positions[f, idx],
+                motion.body_rotations[f, idx],
+            )
+            deltas[name] = m_anim @ rest_world[name].inverted()
+
+        # 2) convert each link delta into the bone's local matrix_basis, then keyframe.
+        #    Blender: pose = parent_pose @ (parent_rest^-1 @ rest) @ basis, so with each
+        #    bone posed to (delta @ rest) the required basis is:
+        #        basis = rest^-1 @ delta_parent^-1 @ delta @ rest
+        for name in drive_names:
+            R = rest_bone[name]
+            pn = parent_name[name]
+            d_parent = deltas.get(pn, identity) if pn is not None else identity
+            basis = R.inverted() @ d_parent.inverted() @ deltas[name] @ R
+
+            pb = armature.pose.bones[name]
+            pb.matrix_basis = basis
+            pb.keyframe_insert(data_path="location", frame=bl_frame)
+            pb.keyframe_insert(data_path="rotation_quaternion", frame=bl_frame)
+
+        if out_i % 100 == 0:
+            print(f"[motion] keyframing {out_i}/{len(frames)}", end="\r")
+
+    print(f"\n[motion] keyframed {len(frames)} frames onto '{armature.name}' "
+          f"({len(drive_names)} bones), scene {frame_start}..{frame_start + len(frames) - 1} "
+          f"@ {C.scene.render.fps}fps (motion {motion_fps}fps)")
+    return len(frames)
+
+
+# ============================================================
 # HELPERS
 # ============================================================
 
