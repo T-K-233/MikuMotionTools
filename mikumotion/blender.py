@@ -2,60 +2,13 @@ import os
 
 import numpy as np
 import bpy
-from dataclasses import dataclass
-from typing import Any
 
 from bpy.types import Object, PoseBone
 from mathutils import Matrix, Quaternion, Vector
 
-
 from .armature_tree import ArmatureTree
-from .urdf import RobotModel, rpy_to_quat
-
-# ============================================================
-# RETARGET CONFIG
-# ============================================================
-
-_current_retarget_config: "RetargetConfig | None" = None
-
-
-@dataclass
-class RetargetConfig:
-    """Configuration for motion retargeting. Set via set_retarget_config() before invoking the operator."""
-
-    source_armature_name: str
-    target_armature_name: str
-    bone_map: "dict[str, str]"  # target -> source
-    translation_root_source: str
-    translation_root_target: str
-    auto_map_same_names: bool = False
-    ignore_twist: bool = False
-    bone_axis_local: "Vector" = None
-    use_rest_orientation_offsets: bool = True
-    use_scene_frame_range: bool = True
-    frame_start: int = 1
-    frame_end: int = 250
-    insert_keyframes: bool = True
-    clear_existing_keys: bool = True
-    frames_per_tick: int = 1
-    timer_step_sec: float = 0.0
-
-    def __post_init__(self) -> None:
-        if self.bone_axis_local is None:
-            self.bone_axis_local = Vector((0.0, 1.0, 0.0))
-
-
-def set_retarget_config(config: RetargetConfig) -> None:
-    """Set the retarget config to use when the modal operator is invoked (by scripts)."""
-    global _current_retarget_config
-    _current_retarget_config = config
-
-
-def get_retarget_config() -> "RetargetConfig | None":
-    """Get the current retarget config, if any."""
-    return _current_retarget_config
 from .motion_sequence import MotionSequence
-from .math import quat_mul
+from .urdf import RobotModel, rpy_to_quat
 
 
 C = bpy.context
@@ -87,19 +40,6 @@ bones.get("bone_name").scale
 # get edit bones
 armature.data.bones
 """
-
-
-def cleanup_usd_axis_display(display_size: float = 0.01) -> None:
-    """
-    This function shrinks the axis display of the imported IsaacLab USD object
-    to make this looks cleaner.
-
-    Args:
-        display_size: the size of the axes
-    """
-    for object in D.objects:
-        if "visuals" in object.name or "collisions" in object.name:
-            object.empty_display_size = display_size
 
 
 def set_scene_fps(fps: int) -> None:
@@ -134,31 +74,6 @@ def set_armature_to_pose(armature: Object) -> None:
     Set the armature to animation pose.
     """
     armature.data.pose_position = "POSE"
-
-
-def set_bones_to_1d_rotation(armature: Object) -> None:
-    """
-    Set the bones to 1D rotation mode, and allow only Y-axis rotation (along the bone axis).
-    Use this function to convert arbitrary armature to "realistic" robot armature with revolute joints.
-
-    Args:
-        armature: The armature object.
-    """
-
-    for bone in armature.pose.bones:
-        print(f"found bone {bone.name}")
-        # set to XYZ rotation mode
-        bone.rotation_mode = "XYZ"
-
-        # allow only Y-axis rotation
-        bone.lock_rotation[0] = False
-        bone.lock_rotation[1] = False
-        bone.lock_rotation[2] = False
-
-        # allow only Y-axis rotation in IK
-        bone.lock_ik_x = False
-        bone.lock_ik_y = False
-        bone.lock_ik_z = False
 
 
 def build_body_motion_data(
@@ -376,30 +291,6 @@ def build_armature(
     armature.data.show_axes = show_axes
 
 
-def bind_to_armature(skeleton_tree: dict):
-
-    armature = D.objects.get("Armature")
-
-    for idx, link_name in enumerate(skeleton_tree["link_names"]):
-        frame = D.objects.get(link_name)
-        bone_name = skeleton_tree["node_names"][idx]
-
-        print(f"binding {link_name} to {bone_name}")
-
-        # the use of matrix world is to maintain the original transform
-        # i.e. the equivalent of "Keep Transform" GUI option
-
-        # save original world matrix
-        matrix_world = frame.matrix_world.copy()
-
-        frame.parent = armature
-        frame.parent_bone = bone_name
-        frame.parent_type = "BONE"
-
-        # restore world matrix to maintain global transform
-        frame.matrix_world = matrix_world.copy()
-
-
 # ============================================================
 # URDF -> ARMATURE + MESH
 # ============================================================
@@ -514,14 +405,10 @@ def parent_object_to_bone(obj: Object, armature: Object, bone_name: str) -> None
     obj.matrix_world = matrix_world
 
 
-def build_robot_from_urdf(
-    robot: RobotModel,
-    name: str = "robot",
-    with_meshes: bool = True,
-    default_length: float = 0.05,
-    show_names: bool = False,
-    show_axes: bool = True,
-) -> Object:
+BONE_LENGTH = 0.05
+
+
+def build_robot_from_urdf(robot: RobotModel, name: str, with_meshes: bool) -> Object:
     """
     Build a Blender armature (one bone per link) and the visual meshes for a parsed URDF robot.
 
@@ -538,22 +425,14 @@ def build_robot_from_urdf(
     Args:
         robot: The parsed RobotModel (see ``mikumotion.urdf.RobotModel.from_file``).
         name: Name of the armature object.
-        with_meshes: Whether to import and attach the visual meshes.
-        default_length: Default bone length passed to ``build_armature``.
-        show_names: Whether to display bone names.
-        show_axes: Whether to display bone axes.
+        with_meshes: Whether to import and attach the visual meshes. A rig used only to
+            carry motion into a retarget does not need them.
 
     Returns:
         The created armature Object.
     """
     tree = robot.to_armature_tree()
-    build_armature(
-        tree,
-        name=name,
-        default_length=default_length,
-        show_names=show_names,
-        show_axes=show_axes,
-    )
+    build_armature(tree, name=name, default_length=BONE_LENGTH, show_names=False, show_axes=False)
     armature = D.objects.get(name)
 
     # ensure the armature sits at the world origin so link world transforms == placement
@@ -608,14 +487,11 @@ def load_motion_to_armature(
     motion: MotionSequence,
     armature: Object,
     tree: ArmatureTree,
-    *,
     frame_start: int = 1,
-    frame_stride: int = 1,
-    set_scene_range: bool = True,
 ) -> int:
     """
     Drive a faithful (one-bone-per-link) armature from a MotionSequence of per-link
-    world poses, inserting a keyframe per sampled frame.
+    world poses, inserting a keyframe per frame and setting the scene's fps and range.
 
     Each link's Blender bone is posed so that its rigidly-parented visual mesh lands
     exactly at that link's world pose from ``motion`` (``body_positions`` /
@@ -631,9 +507,6 @@ def load_motion_to_armature(
         armature: The faithful armature Object (visual meshes parented to its bones).
         tree: The ArmatureTree the armature was built from (for rest link frames).
         frame_start: Blender frame number that motion frame 0 maps to.
-        frame_stride: Sample every Nth motion frame (1 = every frame). Scene FPS is
-            scaled by ``1/stride`` so playback speed is preserved.
-        set_scene_range: If True, set the scene FPS + frame range from the motion.
 
     Returns:
         The number of keyframed frames.
@@ -662,13 +535,11 @@ def load_motion_to_armature(
     body_index = {n: motion.body_names.index(n) for n in drive_names}
     identity = Matrix.Identity(4)
 
-    frames = list(range(0, motion.num_frames, max(1, frame_stride)))
-    if set_scene_range:
-        set_scene_fps(max(1, int(round(motion.fps / max(1, frame_stride)))))
-        set_scene_animation_range(frame_start, frame_start + len(frames) - 1)
+    set_scene_fps(motion.fps)
+    set_scene_animation_range(frame_start, frame_start + motion.num_frames - 1)
 
-    for out_i, f in enumerate(frames):
-        bl_frame = frame_start + out_i
+    for f in range(motion.num_frames):
+        bl_frame = frame_start + f
 
         # 1) world-space delta of each driven link: delta = M_anim @ rest_link^-1
         deltas: "dict[str, Matrix]" = {}
@@ -695,42 +566,22 @@ def load_motion_to_armature(
             pb.keyframe_insert(data_path="location", frame=bl_frame)
             pb.keyframe_insert(data_path="rotation_quaternion", frame=bl_frame)
 
-        if out_i % 100 == 0:
-            print(f"[motion] keyframing {out_i}/{len(frames)}", end="\r")
+        if f % 500 == 0:
+            print(f"[motion] keyframing {f}/{motion.num_frames}")
 
-    print(f"\n[motion] keyframed {len(frames)} frames onto '{armature.name}' "
-          f"({len(drive_names)} bones), scene {frame_start}..{frame_start + len(frames) - 1} "
-          f"@ {C.scene.render.fps}fps (motion {motion.fps}fps)")
-    return len(frames)
+    print(f"[motion] keyframed {motion.num_frames} frames onto '{armature.name}' "
+          f"({len(drive_names)} bones) at {motion.fps}fps")
+    return motion.num_frames
 
 
 # ============================================================
 # HELPERS
 # ============================================================
 
-def quat_normalized_safe(q: Quaternion) -> Quaternion:
-    mag2 = q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z
-    if mag2 < 1e-16:
-        return Quaternion((1.0, 0.0, 0.0, 0.0))
-    mag = mag2 ** 0.5
-    return Quaternion((q.w / mag, q.x / mag, q.y / mag, q.z / mag))
-
-
 def rot3_orthonormalized(m3: Matrix) -> Matrix:
     r = m3.copy()
     r.normalize()
     return r
-
-
-def remove_twist_from_quat(q: Quaternion, twist_axis_world: Vector) -> Quaternion:
-    qn = quat_normalized_safe(q)
-    axis = twist_axis_world.normalized()
-    v = Vector((qn.x, qn.y, qn.z))
-    proj = axis * v.dot(axis)
-    twist = Quaternion((qn.w, proj.x, proj.y, proj.z))
-    twist = quat_normalized_safe(twist)
-    swing = qn @ twist.inverted()
-    return quat_normalized_safe(swing)
 
 
 def get_bone_depth(arm_obj, bone_name):
@@ -750,166 +601,46 @@ def get_pose_world_matrix(arm_obj, bone_name) -> Matrix:
     return arm_obj.matrix_world @ arm_obj.pose.bones[bone_name].matrix
 
 
-def build_bone_map(
-    source_obj: Object,
-    target_obj: Object,
-    base_bone_map: "dict[str, str]",
-    auto_map_same_names: bool = False,
-) -> "dict[str, str]":
-    bone_map = dict(base_bone_map)
+def get_source_delta_world(source_obj, source_bone_name) -> Matrix:
+    """How far the source bone has moved from its own rest pose, in world space."""
+    rest = get_rest_world_matrix(source_obj, source_bone_name)
+    return get_pose_world_matrix(source_obj, source_bone_name) @ rest.inverted()
 
-    if auto_map_same_names:
-        src_names = set(source_obj.pose.bones.keys())
-        tgt_names = set(target_obj.pose.bones.keys())
-        for name in sorted(src_names & tgt_names):
-            if name not in bone_map:
-                bone_map[name] = name
 
+def build_bone_map(source_obj, target_obj, bone_map) -> "dict[str, str]":
+    """Drop any target<-source pair naming a bone that one of the armatures lacks."""
     valid = {}
     for tgt_name, src_name in bone_map.items():
         if source_obj.pose.bones.get(src_name) and target_obj.pose.bones.get(tgt_name):
             valid[tgt_name] = src_name
         else:
-            print(f"[WARN] Skipping invalid bone map: target '{tgt_name}' <- source '{src_name}'")
+            print(f"[retarget] skipping '{tgt_name}' <- '{src_name}': bone missing")
     return valid
 
 
-def get_source_delta_world(source_obj, source_bone_name):
-    src_rest_w = get_rest_world_matrix(source_obj, source_bone_name)
-    src_pose_w = get_pose_world_matrix(source_obj, source_bone_name)
-    return src_pose_w @ src_rest_w.inverted()
-
-
-def compute_rest_orientation_offsets(
-    source_obj: Object,
-    target_obj: Object,
-    bone_map: "dict[str, str]",
-) -> "dict[str, Matrix]":
+def desired_pose_matrix(source_obj, target_obj, source_bone_name, target_bone_name) -> Matrix:
     """
-    Per target bone:
-      R_offset_world = R_tgt_rest_world * inv(R_src_rest_world)
-    so we can do:
-      R_tgt_pose_world = R_offset_world * R_src_pose_world
+    The target bone's pose matrix, in target armature space, rotation only.
+
+    The source bone's *world* rotation delta is applied to the target's rest orientation:
+
+        R_target = (R_source_pose . R_source_rest^-1) . R_target_rest
+
+    Cancelling the source's own rest orientation is what makes this work between rigs that
+    share a rest pose but not their local bone axes — a URDF robot's link frames against a
+    VRM's head->tail bones. Mapping through the rest orientations instead
+    (R_target_rest . R_source_rest^-1 . R_source_pose) silently mangles such a pair.
     """
-    offsets = {}
-    for tgt_name, src_name in bone_map.items():
-        src_rest_r = rot3_orthonormalized(get_rest_world_matrix(source_obj, src_name).to_3x3())
-        tgt_rest_r = rot3_orthonormalized(get_rest_world_matrix(target_obj, tgt_name).to_3x3())
-        offsets[tgt_name] = rot3_orthonormalized(tgt_rest_r @ src_rest_r.inverted())
-    return offsets
+    source_delta = rot3_orthonormalized(get_source_delta_world(source_obj, source_bone_name).to_3x3())
+    target_rest = rot3_orthonormalized(get_rest_world_matrix(target_obj, target_bone_name).to_3x3())
+    desired_world = rot3_orthonormalized(source_delta @ target_rest)
 
+    armature_world = rot3_orthonormalized(target_obj.matrix_world.to_3x3())
+    desired_local = rot3_orthonormalized(armature_world.inverted() @ desired_world)
 
-def get_source_pose_world_rot(source_obj: Object, source_bone_name: str) -> Matrix:
-    pose_w = get_pose_world_matrix(source_obj, source_bone_name)
-    return rot3_orthonormalized(pose_w.to_3x3())
-
-
-def get_target_desired_world_rotation(
-    source_obj: Object,
-    target_obj: Object,
-    source_bone_name: str,
-    target_bone_name: str,
-    *,
-    rest_rot_offsets: "dict[str, Matrix] | None" = None,
-    use_rest_orientation_offsets: bool = True,
-    ignore_twist: bool = False,
-    bone_axis_local: "Vector | None" = None,
-) -> Matrix:
-    """
-    Returns desired target WORLD rotation (3x3).
-    Supports two modes:
-      - offset mode: R_tgt = R_offset * R_src_pose
-      - old delta mode: R_tgt = delta_src * R_tgt_rest
-    """
-    if bone_axis_local is None:
-        bone_axis_local = Vector((0.0, 1.0, 0.0))
-
-    if use_rest_orientation_offsets and rest_rot_offsets is not None:
-        src_pose_r = get_source_pose_world_rot(source_obj, source_bone_name)
-
-        if ignore_twist:
-            src_rest_r = rot3_orthonormalized(get_rest_world_matrix(source_obj, source_bone_name).to_3x3())
-            delta_r = rot3_orthonormalized(src_pose_r @ src_rest_r.inverted())
-            twist_axis_w = (src_rest_r @ bone_axis_local).normalized()
-            dq = remove_twist_from_quat(delta_r.to_quaternion(), twist_axis_w)
-            delta_r = rot3_orthonormalized(dq.to_matrix())
-            src_pose_r = rot3_orthonormalized(delta_r @ src_rest_r)
-
-        tgt_desired_world_r = rot3_orthonormalized(rest_rot_offsets[target_bone_name] @ src_pose_r)
-        return tgt_desired_world_r
-
-    # Fallback (old assumption: same rest orientation)
-    src_delta_w = get_source_delta_world(source_obj, source_bone_name)
-    src_delta_world_r = rot3_orthonormalized(src_delta_w.to_3x3())
-
-    if ignore_twist:
-        src_rest_r = rot3_orthonormalized(get_rest_world_matrix(source_obj, source_bone_name).to_3x3())
-        twist_axis_w = (src_rest_r @ bone_axis_local).normalized()
-        dq = remove_twist_from_quat(src_delta_world_r.to_quaternion(), twist_axis_w)
-        src_delta_world_r = rot3_orthonormalized(dq.to_matrix())
-
-    tgt_rest_r = rot3_orthonormalized(get_rest_world_matrix(target_obj, target_bone_name).to_3x3())
-    return rot3_orthonormalized(src_delta_world_r @ tgt_rest_r)
-
-
-def build_desired_target_pose_matrix_objspace(
-    source_obj: Object,
-    target_obj: Object,
-    source_bone_name: str,
-    target_bone_name: str,
-    *,
-    allow_translation: bool = False,
-    translation_source_bone_name: str | None = None,
-    ignore_twist: bool = False,
-    bone_axis_local: Vector | None = None,
-    rest_rot_offsets: "dict[str, Matrix] | None" = None,
-    use_rest_orientation_offsets: bool = True,
-) -> Matrix:
-    """
-    Builds desired PoseBone.matrix in target ARMATURE OBJECT SPACE.
-    - Root: translation + rotation
-    - Non-root: rotation only
-    """
-    if bone_axis_local is None:
-        bone_axis_local = Vector((0.0, 1.0, 0.0))
-
-    # ---------------- Rotation (with rest-offset mapping support)
-    tgt_desired_world_r = get_target_desired_world_rotation(
-        source_obj=source_obj,
-        target_obj=target_obj,
-        source_bone_name=source_bone_name,
-        target_bone_name=target_bone_name,
-        rest_rot_offsets=rest_rot_offsets,
-        use_rest_orientation_offsets=use_rest_orientation_offsets,
-        ignore_twist=ignore_twist,
-        bone_axis_local=bone_axis_local,
-    )
-
-    arm_world_r = rot3_orthonormalized(target_obj.matrix_world.to_3x3())
-    tgt_desired_obj_r = rot3_orthonormalized(arm_world_r.inverted() @ tgt_desired_world_r)
-
-    tgt_pb = target_obj.pose.bones[target_bone_name]
-    cur_obj_pose = tgt_pb.matrix.copy()
-
-    # ---------------- Translation source (separate configurable source for root)
-    if allow_translation:
-        if translation_source_bone_name is None:
-            translation_source_bone_name = source_bone_name
-
-        src_delta_w_for_translation = get_source_delta_world(source_obj, translation_source_bone_name)
-        tgt_rest_w = get_rest_world_matrix(target_obj, target_bone_name)
-
-        tgt_desired_world_full = src_delta_w_for_translation @ tgt_rest_w
-        tgt_desired_obj_full = target_obj.matrix_world.inverted() @ tgt_desired_world_full
-        loc = tgt_desired_obj_full.to_translation()
-    else:
-        loc = cur_obj_pose.to_translation()
-
-    return Matrix.LocRotScale(
-        loc,
-        tgt_desired_obj_r.to_quaternion(),
-        Vector((1.0, 1.0, 1.0)),
-    )
+    current = target_obj.pose.bones[target_bone_name].matrix
+    return Matrix.LocRotScale(current.to_translation(), desired_local.to_quaternion(),
+                              Vector((1.0, 1.0, 1.0)))
 
 
 def clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_root_target):
@@ -957,47 +688,15 @@ def clear_target_pose_for_frame(target_obj, bone_map):
     bpy.context.view_layer.update()
 
 
-def retarget_frame(
-    source_obj: Object,
-    target_obj: Object,
-    bone_map: "dict[str, str]",
-    translation_root_target: str,
-    translation_root_source: str,
-    *,
-    ignore_twist: bool = False,
-    bone_axis_local: Vector | None = None,
-    rest_rot_offsets: "dict[str, Matrix] | None" = None,
-    use_rest_orientation_offsets: bool = True,
-) -> None:
-    sorted_target_bones = sorted(bone_map.keys(), key=lambda n: get_bone_depth(target_obj, n))
-
+def retarget_frame(source_obj: Object, target_obj: Object, bone_map: "dict[str, str]") -> None:
+    """Pose every mapped target bone for the current frame. Rotation only."""
     clear_target_pose_for_frame(target_obj, bone_map)
 
-    for tgt_name in sorted_target_bones:
-        src_name = bone_map[tgt_name]
-        pb = target_obj.pose.bones[tgt_name]
-
-        allow_translation = (tgt_name == translation_root_target)
-
-        desired_obj_pose = build_desired_target_pose_matrix_objspace(
-            source_obj=source_obj,
-            target_obj=target_obj,
-            source_bone_name=src_name,
-            target_bone_name=tgt_name,
-            allow_translation=allow_translation,
-            translation_source_bone_name=(translation_root_source if allow_translation else None),
-            ignore_twist=ignore_twist,
-            bone_axis_local=bone_axis_local,
-            rest_rot_offsets=rest_rot_offsets,
-            use_rest_orientation_offsets=use_rest_orientation_offsets,
-        )
-
-        pb.matrix = desired_obj_pose
-        pb.scale = Vector((1.0, 1.0, 1.0))
-
-        if not allow_translation:
-            pb.location = Vector((0.0, 0.0, 0.0))
-
+    for tgt_name in sorted(bone_map, key=lambda name: get_bone_depth(target_obj, name)):
+        pose_bone = target_obj.pose.bones[tgt_name]
+        pose_bone.matrix = desired_pose_matrix(source_obj, target_obj, bone_map[tgt_name], tgt_name)
+        pose_bone.scale = Vector((1.0, 1.0, 1.0))
+        pose_bone.location = Vector((0.0, 0.0, 0.0))
         bpy.context.view_layer.update()
 
 
@@ -1007,349 +706,59 @@ def bake_retarget(
     bone_map: "dict[str, str]",
     translation_root_target: str,
     translation_root_source: str,
-    *,
     frame_start: int,
     frame_end: int,
-    ignore_twist: bool = False,
-    bone_axis_local: "Vector | None" = None,
-    use_rest_orientation_offsets: bool = True,
-    clear_existing: bool = True,
-    track_root_world_position: bool = False,
 ) -> int:
     """
-    Headless (non-modal) batch retarget: bake source->target animation onto the
-    target armature over ``[frame_start, frame_end]`` (inclusive), one keyframe per
-    frame. Same math as ``WM_OT_modal_retarget_motion`` but as a plain loop suitable
-    for ``blender --background``.
+    Bake a source armature's motion onto a target armature, one keyframe per frame over
+    ``[frame_start, frame_end]`` inclusive.
 
-    Args:
-        source_obj: Source armature (already animated/keyframed).
-        target_obj: Target armature to receive baked keyframes.
-        bone_map: ``{target_bone: source_bone}`` mapping (invalid pairs are skipped).
-        translation_root_target/source: bone pair whose world translation drives the
-            target root (only this target bone receives translation).
-        frame_start, frame_end: inclusive Blender frame range to bake.
-        ignore_twist: remove twist about ``bone_axis_local`` from transferred rotation.
-        use_rest_orientation_offsets: if True, transfer rotation in the *rest-relative*
-            (local-delta) sense ``R_tgt = R_tgt_rest·R_src_rest⁻¹·R_src_pose`` — only
-            correct when source and target bones share local axis conventions. If False,
-            transfer the source's *world* rotation delta ``R_tgt = (R_src_pose·R_src_rest⁻¹)·R_tgt_rest``
-            — the right choice when the two rigs have the SAME rest pose (e.g. both
-            T-pose) but unrelated local frames, as with a URDF robot -> VRM humanoid.
-        clear_existing: remove pre-existing F-curves for the mapped bones first.
-        track_root_world_position: override the translation-root bone so its world
-            *position* tracks the source root's world position directly (offset so the
-            two align at ``frame_start``), instead of the default rest-relative transfer.
-            Use this when source and target roots have different rest positions (e.g. a
-            URDF robot whose pelvis rest is at the origin vs. a VRM whose hips rest is at
-            standing height): the default transfer rotates the target's tall rest offset
-            by the root's rotation, which sinks/launches the root on large root rotations
-            (e.g. lying prone). Position-only tracking keeps the root where the source is.
+    Every bone takes the source's world rotation delta (see ``desired_pose_matrix``). The
+    root additionally has its world *position* set to follow the source root, offset so the
+    two line up at ``frame_start``. Deriving the root position from its rest pose instead
+    would rotate the target's rest hip offset by the root's rotation, which sinks the
+    character through the floor as soon as the root rotates far — lying prone, say.
 
-    Returns:
-        Number of frames baked.
+    Returns the number of frames baked.
     """
     assert source_obj.type == "ARMATURE" and target_obj.type == "ARMATURE", "both must be armatures"
 
-    bone_map = build_bone_map(source_obj, target_obj, bone_map, auto_map_same_names=False)
+    bone_map = build_bone_map(source_obj, target_obj, bone_map)
     if not bone_map:
         raise ValueError("no valid bone mappings (check source/target bone names)")
     if translation_root_target not in bone_map:
-        raise ValueError(f"translation_root_target '{translation_root_target}' not in bone_map")
+        raise ValueError(f"translation root '{translation_root_target}' is not in the bone map")
     if source_obj.pose.bones.get(translation_root_source) is None:
-        raise ValueError(f"translation_root_source '{translation_root_source}' missing on source")
+        raise ValueError(f"source armature has no bone '{translation_root_source}'")
 
-    rest_rot_offsets = (
-        compute_rest_orientation_offsets(source_obj, target_obj, bone_map)
-        if use_rest_orientation_offsets else None
-    )
+    clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_root_target)
 
-    if clear_existing:
-        clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_root_target)
+    C.scene.frame_set(frame_start)
+    bpy.context.view_layer.update()
+    source_root = source_obj.pose.bones[translation_root_source]
+    root_offset = (get_rest_world_matrix(target_obj, translation_root_target).to_translation()
+                   - (source_obj.matrix_world @ source_root.matrix).to_translation())
 
-    # for root position tracking: offset so the target root's world position equals the
-    # source root's world position, aligned to the target's rest position at frame_start.
-    root_pos_offset = None
-    if track_root_world_position:
-        C.scene.frame_set(frame_start)
-        bpy.context.view_layer.update()
-        src_pb0 = source_obj.pose.bones[translation_root_source]
-        src_w0 = (source_obj.matrix_world @ src_pb0.matrix).to_translation()
-        tgt_rest0 = get_rest_world_matrix(target_obj, translation_root_target).to_translation()
-        root_pos_offset = tgt_rest0 - src_w0
-
-    n = 0
-    for f in range(frame_start, frame_end + 1):
-        C.scene.frame_set(f)
+    for frame in range(frame_start, frame_end + 1):
+        C.scene.frame_set(frame)
         bpy.context.view_layer.update()
 
-        retarget_frame(
-            source_obj=source_obj,
-            target_obj=target_obj,
-            bone_map=bone_map,
-            translation_root_target=translation_root_target,
-            translation_root_source=translation_root_source,
-            ignore_twist=ignore_twist,
-            bone_axis_local=bone_axis_local,
-            rest_rot_offsets=rest_rot_offsets,
-            use_rest_orientation_offsets=use_rest_orientation_offsets,
-        )
+        retarget_frame(source_obj, target_obj, bone_map)
 
-        if root_pos_offset is not None:
-            # keep the baked root rotation, but set its world position to track the source
-            src_pb = source_obj.pose.bones[translation_root_source]
-            desired_world = (source_obj.matrix_world @ src_pb.matrix).to_translation() + root_pos_offset
-            tgt_pb = target_obj.pose.bones[translation_root_target]
-            m_world = target_obj.matrix_world @ tgt_pb.matrix
-            m_world.translation = desired_world
-            tgt_pb.matrix = target_obj.matrix_world.inverted() @ m_world
-            bpy.context.view_layer.update()
-
-        for tgt_name in bone_map.keys():
-            pb = target_obj.pose.bones[tgt_name]
-            pb.keyframe_insert(data_path="rotation_quaternion", frame=f)
-            pb.keyframe_insert(data_path="location", frame=f)
-
-        n += 1
-        if (f - frame_start) % 100 == 0:
-            print(f"[retarget] frame {f}/{frame_end}", end="\r")
-
-    print(f"\n[retarget] baked {n} frames onto '{target_obj.name}' ({len(bone_map)} mapped bones)")
-    return n
-
-
-# ============================================================
-# MODAL OPERATOR (responsive UI, ESC cancel)
-# ============================================================
-
-class WM_OT_modal_retarget_motion(bpy.types.Operator):
-    bl_idname = "wm.modal_retarget_motion"
-    bl_label = "Modal Retarget Motion"
-    bl_description = "Retarget animation without freezing Blender UI (ESC to cancel)"
-    bl_options = {'REGISTER'}
-
-    _timer = None
-    _state = None
-
-    def _cleanup(self, context):
-        wm = context.window_manager
-        if self._timer is not None:
-            wm.event_timer_remove(self._timer)
-            self._timer = None
-        try:
-            wm.progress_end()
-        except Exception:
-            pass
-        if context.area:
-            context.area.tag_redraw()
-
-    def _fail(self, context, msg):
-        self.report({'ERROR'}, msg)
-        print("[ERROR]", msg)
-        self._cleanup(context)
-        return {'CANCELLED'}
-
-    def invoke(self, context: Any, event: Any) -> Any:
-        cfg = get_retarget_config()
-        if cfg is None:
-            return self._fail(
-                context,
-                "No retarget config. Call set_retarget_config(RetargetConfig(...)) before invoking.",
-            )
-
-        source_obj = bpy.data.objects.get(cfg.source_armature_name)
-        target_obj = bpy.data.objects.get(cfg.target_armature_name)
-
-        if source_obj is None or target_obj is None:
-            return self._fail(context, "Could not find source/target armature objects.")
-        if source_obj.type != 'ARMATURE' or target_obj.type != 'ARMATURE':
-            return self._fail(context, "Source/target objects must be ARMATUREs.")
-
-        bone_map = build_bone_map(
-            source_obj,
-            target_obj,
-            cfg.bone_map,
-            cfg.auto_map_same_names,
-        )
-        if not bone_map:
-            return self._fail(context, "No valid bone mappings found.")
-
-        if cfg.translation_root_target not in bone_map:
-            return self._fail(
-                context,
-                f'TRANSLATION_ROOT_TARGET "{cfg.translation_root_target}" must be in BONE_MAP target names.',
-            )
-        if source_obj.pose.bones.get(cfg.translation_root_source) is None:
-            return self._fail(
-                context,
-                f'TRANSLATION_ROOT_SOURCE "{cfg.translation_root_source}" not found in source armature.',
-            )
-
-        rest_rot_offsets = (
-            compute_rest_orientation_offsets(source_obj, target_obj, bone_map)
-            if cfg.use_rest_orientation_offsets
-            else None
-        )
-
-        scene = context.scene
-        frame_start = scene.frame_start if cfg.use_scene_frame_range else cfg.frame_start
-        frame_end = scene.frame_end if cfg.use_scene_frame_range else cfg.frame_end
-
-        if cfg.clear_existing_keys:
-            clear_existing_keyframes_for_mapped_bones(
-                target_obj, bone_map, cfg.translation_root_target
-            )
-
-        self._state = {
-            "source_obj": source_obj,
-            "target_obj": target_obj,
-            "bone_map": bone_map,
-            "translation_root_target": cfg.translation_root_target,
-            "translation_root_source": cfg.translation_root_source,
-            "rest_rot_offsets": rest_rot_offsets,
-            "use_rest_orientation_offsets": cfg.use_rest_orientation_offsets,
-            "frame_start": frame_start,
-            "frame_end": frame_end,
-            "frame": frame_start,
-            "cancelled": False,
-            "insert_keyframes": cfg.insert_keyframes,
-            "ignore_twist": cfg.ignore_twist,
-            "bone_axis_local": cfg.bone_axis_local,
-            "frames_per_tick": cfg.frames_per_tick,
-        }
-
-        print(f"[INFO] Translation source bone: {cfg.translation_root_source}")
-        print(f"[INFO] Rest orientation offsets: {'ENABLED' if cfg.use_rest_orientation_offsets else 'DISABLED'}")
-        print(f"[INFO] Translation target bone: {cfg.translation_root_target}")
-        print(f"[INFO] Retargeting frames {frame_start}..{frame_end}")
-        print(f"[INFO] Bone count: {len(bone_map)}")
-        print("[INFO] Modal retarget started. Press ESC to cancel.")
-
-        wm = context.window_manager
-        wm.progress_begin(frame_start, frame_end + 1)
-
-        self._timer = wm.event_timer_add(cfg.timer_step_sec, window=context.window)
-        wm.modal_handler_add(self)
-
-        if context.area:
-            context.area.tag_redraw()
-
-        return {'RUNNING_MODAL'}
-
-    def modal(self, context, event):
-        if self._state is None:
-            return self._fail(context, "Internal state missing.")
-
-        # Allow user cancel
-        if event.type in {'ESC'}:
-            self._state["cancelled"] = True
-            print("[INFO] Retarget cancelled by user.")
-            self.report({'WARNING'}, "Retarget cancelled.")
-            self._cleanup(context)
-            return {'CANCELLED'}
-
-        if event.type != 'TIMER':
-            return {'PASS_THROUGH'}
-
-        st = self._state
-        scene = context.scene
-
-        try:
-            frames_per_tick = st.get("frames_per_tick", 1)
-            insert_keyframes = st.get("insert_keyframes", True)
-            ignore_twist = st.get("ignore_twist", False)
-            bone_axis_local = st.get("bone_axis_local")
-
-            for _ in range(max(1, frames_per_tick)):
-                f = st["frame"]
-                if f > st["frame_end"]:
-                    print("[INFO] Retargeting complete.")
-                    self.report({'INFO'}, "Retarget complete.")
-                    self._cleanup(context)
-                    return {'FINISHED'}
-
-                scene.frame_set(f)
-                bpy.context.view_layer.update()
-
-                retarget_frame(
-                    source_obj=st["source_obj"],
-                    target_obj=st["target_obj"],
-                    bone_map=st["bone_map"],
-                    translation_root_target=st["translation_root_target"],
-                    translation_root_source=st["translation_root_source"],
-                    ignore_twist=ignore_twist,
-                    bone_axis_local=bone_axis_local,
-                    rest_rot_offsets=st.get("rest_rot_offsets"),
-                    use_rest_orientation_offsets=st.get("use_rest_orientation_offsets", True),
-                )
-
-                if insert_keyframes:
-                    for tgt_name in st["bone_map"].keys():
-                        pb = st["target_obj"].pose.bones[tgt_name]
-                        pb.keyframe_insert(data_path="rotation_quaternion", frame=f)
-                        pb.keyframe_insert(data_path="scale", frame=f)
-                        pb.keyframe_insert(data_path="location", frame=f)
-
-                context.window_manager.progress_update(f)
-
-                if f % 10 == 0:
-                    print(f"[INFO] frame {f}/{st['frame_end']}")
-
-                st["frame"] += 1
-
-            # Request viewport / UI redraw
-            for window in context.window_manager.windows:
-                for area in window.screen.areas:
-                    area.tag_redraw()
-
-            return {'RUNNING_MODAL'}
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return self._fail(context, f"Retarget error: {e}")
-
-
-def load_replay(skeleton_tree: dict, armature: Object, data_path: str):
-    # TODO: refactor the replay motion format to use the same format as the motion data
-    data = np.load(data_path)
-
-    fps = data["fps"]
-    joint_order = data["joint_order"].tolist()
-    root_positions = data["root_positions"]
-    root_quaternions = data["root_quaternions"]
-    joint_positions = data["joint_positions"]
-
-
-    print(joint_positions.shape)
-
-    n_frames = joint_positions.shape[0]
-    n_dof = joint_positions.shape[-1]
-
-    bpy.context.scene.frame_start = 0
-    bpy.context.scene.frame_end = n_frames
-
-    for frame in range(n_frames):
-        bpy.context.scene.frame_set(frame)
+        target_root = target_obj.pose.bones[translation_root_target]
+        world = target_obj.matrix_world @ target_root.matrix
+        world.translation = (source_obj.matrix_world @ source_root.matrix).to_translation() + root_offset
+        target_root.matrix = target_obj.matrix_world.inverted() @ world
         bpy.context.view_layer.update()
 
-        root = armature.pose.bones.get("pelvis")
-        root.location = root_positions[frame]
-        # root.location[2] -= 0.6
-        root.keyframe_insert(data_path="location", frame=frame)
+        for tgt_name in bone_map:
+            pose_bone = target_obj.pose.bones[tgt_name]
+            pose_bone.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+            pose_bone.keyframe_insert(data_path="location", frame=frame)
 
-        root.rotation_mode = "QUATERNION"
-        root.rotation_quaternion = root_quaternions[frame]
-        root.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+        if (frame - frame_start) % 100 == 0:
+            print(f"[retarget] frame {frame}/{frame_end}")
 
-        for joint_idx, joint_name in enumerate(joint_order):
-            bone_name = joint_name.replace("_joint", "")
-            bone = armature.pose.bones.get(bone_name)
-            # ensure using Euler angles
-            bone.rotation_mode = "XYZ"
-            bone.rotation_euler[1] = joint_positions[frame, joint_idx]
-
-            # insert rotation_euler keyframe, for index 1 (Y-axis)
-            bone.keyframe_insert(data_path="rotation_euler", index=1, frame=frame)
-
-        print(f"Processing: #{frame}/{n_frames} ({frame / n_frames * 100:.2f}%)")
+    baked = frame_end - frame_start + 1
+    print(f"[retarget] baked {baked} frames onto '{target_obj.name}' ({len(bone_map)} bones)")
+    return baked

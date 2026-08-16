@@ -20,6 +20,8 @@ and https://chingswy.github.io/easymocap-public-doc/database/2_keypoints.html#sm
 
 """
 
+import numpy as np
+
 
 ACCAD_TO_G1_CFG = {
     "pelvis": {  # 0
@@ -1318,6 +1320,62 @@ PRESETS = {
     "MMD_YYB_TO_G1_CFG": MMD_YYB_TO_G1_CFG,
     "MESHCAPADE_TO_G1_CFG": MESHCAPADE_TO_G1_CFG,
     "MIXAMO_TO_G1_CFG": MIXAMO_TO_G1_CFG,
+}
+
+
+# ============================================================
+# Blender mocap armature  ->  motion  (direction 1: animation -> robot)
+# ============================================================
+# One entry per source rig for scripts/blender/export_mocap.py. Bones are listed in
+# SMPL keypoint order, so the same index means the same body part across every rig.
+# ``scale`` converts the rig's units to metres; ``rotate_z`` turns it to +X forward,
+# since Blender rigs are authored +Y forward.
+
+MOCAP_EXPORTS = {
+    "zamuza": {
+        "armature": "Armature",
+        "scale": 1.0,
+        "rotate_z": 0.0,
+        "frames": (0, 2000),
+        "bones": [
+            "pelvis", "left_upper_leg", "right_upper_leg", "torso",
+            "left_lower_leg", "right_lower_leg", "torso",
+            "left_foot", "right_foot", "head",
+            "left_upper_arm", "right_upper_arm",
+            "left_lower_arm", "right_lower_arm",
+            "left_hand", "right_hand",
+        ],
+    },
+    "accad": {
+        "armature": "armature",
+        "scale": 0.8,
+        "rotate_z": -np.pi / 2,
+        "frames": (0, 652),
+        # LeftForearm/RightForearm are omitted: those two bones are buggy in this rig
+        "bones": [
+            "Hips", "LeftUpLeg", "RightUpLeg", "ToSpine",
+            "LeftLeg", "RightLeg", "Spine", "LeftFoot", "RightFoot", "Spine1",
+            "LeftToeBase", "RightToeBase", "Neck",
+            "LeftShoulder", "RightShoulder", "Head",
+            "LeftArm", "RightArm", "LeftHand", "RightHand",
+        ],
+    },
+    "actorcore": {
+        "armature": "Armature",
+        "scale": 0.7 * 0.01,
+        "rotate_z": np.pi / 2,
+        "frames": (0, 293),
+        "bones": [
+            "CC_Base_Pelvis", "CC_Base_L_Thigh", "CC_Base_R_Thigh", "CC_Base_Spine01",
+            "CC_Base_L_Calf", "CC_Base_R_Calf", "CC_Base_Spine02",
+            "CC_Base_L_Foot", "CC_Base_R_Foot",
+            "CC_Base_L_ToeBaseShareBone", "CC_Base_R_ToeBaseShareBone",
+            "CC_Base_NeckTwist02", "CC_Base_L_Clavicle", "CC_Base_R_Clavicle",
+            "CC_Base_Head", "CC_Base_L_Upperarm", "CC_Base_R_Upperarm",
+            "CC_Base_L_Forearm", "CC_Base_R_Forearm",
+            "CC_Base_L_Hand", "CC_Base_R_Hand",
+        ],
+    },
 }
 
 

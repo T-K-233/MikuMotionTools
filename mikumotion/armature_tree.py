@@ -155,25 +155,6 @@ class ArmatureTree:
             return None  # root
         return self._body_names[parent_index]
 
-    def to_file(self, path: str) -> None:
-        """
-        Serialize the armature tree to a `.npz` file.
-
-        Args:
-            path: the path of the file
-        """
-        serialized = {
-            "body_names": self.body_names,
-            "body_parent_indices": self.body_parent_indices,
-            "local_translations": self.local_translations,
-            "local_rotations": self.local_rotations,
-        }
-        np.savez(path, **serialized)
-
-    @classmethod
-    def from_file(cls, path: str) -> "ArmatureTree":
-        return cls(**np.load(path, allow_pickle=True).item())
-
     @classmethod
     def from_mjcf(cls, path: str) -> "ArmatureTree":
         """
