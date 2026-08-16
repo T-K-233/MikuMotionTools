@@ -4,7 +4,6 @@ The ``mikumotion`` command line: one entry point for working with motion files.
     mikumotion import <mcap> <mjcf>    a robot log becomes a motion (robot -> animation)
     mikumotion view <name>             watch a motion in the Rerun viewer
     mikumotion retarget <name> <mjcf>  solve a robot's joints for a motion (animation -> robot)
-    mikumotion migrate <npz>           bring a motion in from the retired numpy format
     mikumotion list                    show the motions in the store
 
 Motions are addressed by name, not by path: the layout under ``--root`` (see
@@ -73,28 +72,6 @@ def run_retarget(args):
     MotionRetargeting(args.name, args.mjcf, store).run(args.realtime)
 
 
-def run_migrate(args):
-    """Convert a motion saved in the retired numpy format into the store."""
-    import numpy as np
-
-    from .motion_sequence import ARRAY_FIELDS, MotionSequence
-
-    store = MotionStore(args.root)
-    data = np.load(args.npz)
-    motion = MotionSequence(
-        num_frames=int(data["body_positions"].shape[0]),
-        joint_names=[str(name) for name in data["joint_names"]],
-        body_names=[str(name) for name in data["body_names"]],
-        fps=int(np.asarray(data["fps"]).reshape(-1)[0]),
-    )
-    for field in ARRAY_FIELDS:
-        getattr(motion, field)[:] = data[field]
-
-    name = args.name or Path(args.npz).stem
-    print(f"{name}: {motion!r}")
-    print(f"  {store.write_motion(name, motion)}")
-
-
 def run_list(args):
     store = MotionStore(args.root)
     for path in sorted((store.root / "base").glob("*.rrd")):
@@ -124,11 +101,6 @@ def main():
     retarget.add_argument("mjcf", help="target robot MJCF")
     retarget.add_argument("--realtime", action="store_true", help="throttle to playback speed")
     retarget.set_defaults(handler=run_retarget)
-
-    migrate = commands.add_parser("migrate", help="convert a motion from the retired .npz format")
-    migrate.add_argument("npz")
-    migrate.add_argument("--name", help="motion name (defaults to the .npz file name)")
-    migrate.set_defaults(handler=run_migrate)
 
     listing = commands.add_parser("list", help="show the motions in the store")
     listing.set_defaults(handler=run_list)

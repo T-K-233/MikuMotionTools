@@ -55,7 +55,6 @@ Motions are addressed by **name**, not by path; the store layout decides where e
 mikumotion import <log.mcap> <robot.xml> <robot.urdf>   # robot log -> motion
 mikumotion view <name>                                  # watch it in the Rerun viewer
 mikumotion retarget <name> <robot.xml>                  # solve a robot's joints for a motion
-mikumotion migrate <old.npz>                            # bring in a motion from the retired format
 mikumotion list                                         # what is in the store
 ```
 
