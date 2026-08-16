@@ -5,9 +5,8 @@ import mujoco
 import mujoco.viewer
 from tqdm import tqdm
 
-from mikumotion.motion_sequence import MotionSequence
+from mikumotion.motion_sequence import MotionSequence, MotionStore
 from mikumotion.mujoco_utils import add_body_frames
-from mikumotion.rrd_io import MotionStore
 
 SOLVER = "daqp"
 DAMPING = 0.5
@@ -16,6 +15,10 @@ MAX_ITER = 40
 
 class MotionRetargeting:
     """
+    **animation -> robot, step 2 of 2: hub to hub.**
+    Solves a robot's joints for a character motion, by IK. The mirror of
+    :func:`mikumotion.blender.retarget_armature`, which retargets the other way.
+
     The MotionRetargeting logic.
 
     It takes in a mapping table, a source motion file, and a target model file.
@@ -51,11 +54,9 @@ class MotionRetargeting:
     ```
 
     Args:
-        motion_file: The source motion file.
+        motion_name: Name of the source motion in the store.
         robot_xml: The robot XML file used for IK solving.
-        solver: The solver to use for the inverse kinematics.
-        damping: The damping factor for the inverse kinematics.
-        max_iter: The maximum number of iterations for the inverse kinematics.
+        store: Where the source motion is read from and ``<name>_retargeted`` is written.
     """
     def __init__(self, motion_name: str, robot_xml: str, store: MotionStore):
         self.motion_name = motion_name

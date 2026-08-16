@@ -23,19 +23,19 @@ if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 
 from mikumotion.blender import (  # noqa: E402
-    build_body_motion_data,
+    motion_from_armature,
     set_armature_to_pose,
     set_armature_to_rest,
     set_scene_animation_range,
 )
 from mikumotion.motion_sequence import rotate_motion  # noqa: E402
 from mikumotion.presets import MOCAP_EXPORTS  # noqa: E402
-from mikumotion.rrd_io import MotionStore  # noqa: E402
+from mikumotion.motion_sequence import MotionStore  # noqa: E402
 
 
 def export(armature, preset, name, store):
     """Read the current frame range off the armature and store it as ``name``."""
-    motion = build_body_motion_data(armature, preset["bones"])
+    motion = motion_from_armature(armature, preset["bones"])
     motion.body_positions *= preset["scale"]
     motion.body_linear_velocities *= preset["scale"]
 

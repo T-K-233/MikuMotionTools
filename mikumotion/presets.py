@@ -1382,8 +1382,7 @@ MOCAP_EXPORTS = {
 # ============================================================
 # lite_pro robot  ->  VRM / VRoid humanoid
 # ============================================================
-# Bone map for the Blender source->target armature retargeter
-# (mikumotion.blender.RetargetConfig / bake_retarget): {target_vrm_bone: source_robot_link}.
+# Bone map for mikumotion.blender.retarget_armature: {target_vrm_bone: source_robot_link}.
 #
 # The robot models each articulation as a *chain* of 1-DOF links, so each VRM
 # ball bone is driven by the robot link that carries that segment's full

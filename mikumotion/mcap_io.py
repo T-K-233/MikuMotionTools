@@ -1,4 +1,7 @@
 """
+**robot -> animation, ingest.** Decodes the log that
+:func:`mikumotion.forward_kinematics.motion_from_robot_log` turns into a motion.
+
 Read a robot-motion log from an ``.mcap`` file into plain numpy arrays.
 
 The logs produced by the Lite-Pro tracking pipeline are **ROS2 (CDR-encoded)** MCAP
@@ -7,7 +10,7 @@ files with two synchronized channels sampled at a fixed rate:
 - ``/odom``          — ``nav_msgs/msg/Odometry``    : floating-base pose (+ twist) in ``world``.
 - ``/joint_states``  — ``sensor_msgs/msg/JointState``: per-joint angles (+ velocities).
 
-``read_motion_mcap`` decodes both channels, aligns them by timestamp, converts the
+``read_robot_log`` decodes both channels, aligns them by timestamp, converts the
 base orientation from ROS ``xyzw`` to the ``wxyz`` convention used everywhere else in
 this codebase, and returns everything as dense numpy arrays. It is deliberately
 free of any ``mujoco``/``bpy`` dependency so it can run anywhere.
@@ -26,7 +29,7 @@ ODOM_TOPIC = "/odom"
 JOINT_TOPIC = "/joint_states"
 
 
-def read_motion_mcap(path: str, *, odom_topic: str = ODOM_TOPIC, joint_topic: str = JOINT_TOPIC) -> Dict:
+def read_robot_log(path: str, *, odom_topic: str = ODOM_TOPIC, joint_topic: str = JOINT_TOPIC) -> Dict:
     """Read a ROS2 motion ``.mcap`` into aligned numpy arrays.
 
     Args:
@@ -164,7 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--mcap", type=str, required=True)
     args = parser.parse_args()
 
-    data = read_motion_mcap(args.mcap)
+    data = read_robot_log(args.mcap)
     print("joint_names:", data["joint_names"])
     print("base_positions[0]:", data["base_positions"][0])
     print("base_quaternions[0] (wxyz):", data["base_quaternions"][0])

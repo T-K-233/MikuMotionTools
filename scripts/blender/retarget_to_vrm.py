@@ -22,7 +22,7 @@ if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 
 from mikumotion import blender, blender_scene, presets, urdf  # noqa: E402
-from mikumotion.rrd_io import MotionStore  # noqa: E402
+from mikumotion.motion_sequence import MotionStore  # noqa: E402
 
 
 def parse_args():
@@ -50,10 +50,10 @@ def main():
     robot = urdf.RobotModel.from_file(args.urdf)
     tree = robot.to_armature_tree()
     source = blender.build_robot_from_urdf(robot, name="retarget_source", with_meshes=False)
-    blender.load_motion_to_armature(motion, source, tree)
+    blender.armature_from_motion(motion, source, tree)
 
     root_target, root_source = presets.LITE_PRO_TO_VROID_TRANSLATION_ROOT
-    blender.bake_retarget(
+    blender.retarget_armature(
         source, target, presets.LITE_PRO_TO_VROID_BONE_MAP,
         translation_root_target=root_target,
         translation_root_source=root_source,

@@ -8,7 +8,7 @@ The ``mikumotion`` command line: one entry point for working with motion files.
     mikumotion list                    show the motions in the store
 
 Motions are addressed by name, not by path: the layout under ``--root`` (see
-:mod:`mikumotion.rrd_io`) decides where each layer lives.
+:mod:`mikumotion.motion_sequence`) decides where each layer lives.
 """
 
 import argparse
@@ -17,7 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from .rrd_io import MotionStore
+from .motion_sequence import MotionStore
 
 
 def compose_for_viewing(store, name, destination):
@@ -45,11 +45,11 @@ def compose_for_viewing(store, name, destination):
 
 
 def run_import(args):
-    from .forward_kinematics import motion_from_policy_log
+    from .forward_kinematics import motion_from_robot_log
 
     store = MotionStore(args.root)
     name = args.name or Path(args.mcap).stem
-    motion = motion_from_policy_log(args.mcap, args.mjcf)
+    motion = motion_from_robot_log(args.mcap, args.mjcf)
     store.write_motion(name, motion)
     store.write_preview(name, motion, args.urdf)
     print(f"{name}: {motion!r}")
@@ -73,21 +73,11 @@ def run_retarget(args):
     MotionRetargeting(args.name, args.mjcf, store).run(args.realtime)
 
 
-MOTION_ARRAYS = [
-    "joint_positions",
-    "joint_velocities",
-    "body_positions",
-    "body_rotations",
-    "body_linear_velocities",
-    "body_angular_velocities",
-]
-
-
 def run_migrate(args):
     """Convert a motion saved in the retired numpy format into the store."""
     import numpy as np
 
-    from .motion_sequence import MotionSequence
+    from .motion_sequence import ARRAY_FIELDS, MotionSequence
 
     store = MotionStore(args.root)
     data = np.load(args.npz)
@@ -97,7 +87,7 @@ def run_migrate(args):
         body_names=[str(name) for name in data["body_names"]],
         fps=int(np.asarray(data["fps"]).reshape(-1)[0]),
     )
-    for field in MOTION_ARRAYS:
+    for field in ARRAY_FIELDS:
         getattr(motion, field)[:] = data[field]
 
     name = args.name or Path(args.npz).stem

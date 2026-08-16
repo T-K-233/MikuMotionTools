@@ -5,7 +5,7 @@ stored motion on it.
     blender --background --factory-startup \
         --python scripts/blender/animate_robot.py -- <motion> <urdf> [--video out.mp4]
 
-The motion is named, not a path: it is read from the store (see mikumotion.rrd_io), which
+The motion is named, not a path: it is read from the store (see mikumotion.motion_sequence), which
 needs rerun-sdk inside Blender's own Python:
 
     <blender>/python/bin/python.exe -m pip install rerun-sdk
@@ -20,7 +20,7 @@ if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 
 from mikumotion import blender, blender_scene, urdf  # noqa: E402
-from mikumotion.rrd_io import MotionStore  # noqa: E402
+from mikumotion.motion_sequence import MotionStore  # noqa: E402
 
 
 def parse_args():
@@ -44,7 +44,7 @@ def build_scene(motion, urdf_path):
     robot = urdf.RobotModel.from_file(urdf_path)
     tree = robot.to_armature_tree()
     armature = blender.build_robot_from_urdf(robot, name=robot.name, with_meshes=True)
-    blender.load_motion_to_armature(motion, armature, tree)
+    blender.armature_from_motion(motion, armature, tree)
     return armature
 
 

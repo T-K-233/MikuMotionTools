@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from mikumotion.motion_sequence import MotionSequence
-from mikumotion.rrd_io import MotionStore, quat_to_wxyz, quat_to_xyzw
+from mikumotion.motion_sequence import MotionSequence, MotionStore, quat_to_wxyz, quat_to_xyzw
 
 URDF = """<?xml version="1.0"?>
 <robot name="testbot">

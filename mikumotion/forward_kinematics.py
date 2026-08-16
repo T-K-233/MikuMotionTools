@@ -1,4 +1,8 @@
 """
+**robot -> animation, step 1 of 2: into the hub.**
+Converts a robot log into a motion; the mirror of
+:func:`mikumotion.blender.motion_from_armature`, which does the same job for direction 1.
+
 Convert a policy/tracking motion log (joint angles + floating-base pose) into a
 :class:`~mikumotion.motion_sequence.MotionSequence` of **per-link world poses** via
 MuJoCo forward kinematics.
@@ -23,7 +27,7 @@ from __future__ import annotations
 import numpy as np
 import mujoco
 
-from .mcap_io import read_motion_mcap
+from .mcap_io import read_robot_log
 from .motion_sequence import MotionSequence
 
 
@@ -45,7 +49,7 @@ def matrix_to_quat(rotation: np.ndarray) -> np.ndarray:
     return quat
 
 
-def motion_from_policy_log(
+def motion_from_robot_log(
     mcap_path: str,
     mjcf_path: str,
     base_body: str = "pelvis",
@@ -53,7 +57,7 @@ def motion_from_policy_log(
     """Build a :class:`MotionSequence` (per-link world poses) from an mcap motion log.
 
     Args:
-        mcap_path: Path to the ROS2 motion ``.mcap`` (see :func:`read_motion_mcap`).
+        mcap_path: Path to the ROS2 motion ``.mcap`` (see :func:`read_robot_log`).
         mjcf_path: Path to the robot MJCF used for forward kinematics.
         base_body: Name of the body whose world pose the ``/odom`` topic reports
             (the floating base; ``pelvis`` for lite_pro).
@@ -64,7 +68,7 @@ def motion_from_policy_log(
         finite-difference body velocities, and the logged joint angles/velocities
         reordered to the MJCF joint order.
     """
-    log = read_motion_mcap(mcap_path)
+    log = read_robot_log(mcap_path)
     fps = int(log["fps"])
     dt = 1.0 / fps
 

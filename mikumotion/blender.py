@@ -76,12 +76,16 @@ def set_armature_to_pose(armature: Object) -> None:
     armature.data.pose_position = "POSE"
 
 
-def build_body_motion_data(
+def motion_from_armature(
     armature: Object,
     bone_names: list[str],
     blender_bone_postfix: str = ".frame",
 ) -> MotionSequence:
     """
+    **animation -> robot, step 1 of 2: into the hub.**
+    Reads a Blender armature's animation as a motion; the mirror of
+    ``forward_kinematics.motion_from_robot_log``, and the inverse of ``armature_from_motion``.
+
     Build rigid body motion data from the source armature.
     The joint motion data is not included in this function, and will be initialized
     as a properly-dimensioned zero array. The joint motion data will be populated during the
@@ -114,12 +118,11 @@ def build_body_motion_data(
 
     # === extract motion data ===
     for frame in range(n_frames):
-        # navigate to the corresponding frame
+        # navigate to the corresponding frame. frame_set already re-evaluates the
+        # depsgraph, so the pose matrices below are current; an earlier version also
+        # pumped wm.redraw_timer to force that, which cannot run in background Blender.
         bpy.context.scene.frame_set(start_frame + frame)
         bpy.context.view_layer.update()
-
-        # force UI update to update bone pose matrix
-        bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
 
         # read bone positions
         for idx, bone_name in enumerate(motion.body_names):
@@ -483,13 +486,16 @@ def build_robot_from_urdf(robot: RobotModel, name: str, with_meshes: bool) -> Ob
 # MOTION -> ARMATURE (drive the faithful rig from a MotionSequence)
 # ============================================================
 
-def load_motion_to_armature(
+def armature_from_motion(
     motion: MotionSequence,
     armature: Object,
     tree: ArmatureTree,
     frame_start: int = 1,
 ) -> int:
     """
+    **robot -> animation, step 2 of 2: out of the hub.**
+    Plays a motion on a Blender armature; the inverse of ``motion_from_armature``.
+
     Drive a faithful (one-bone-per-link) armature from a MotionSequence of per-link
     world poses, inserting a keyframe per frame and setting the scene's fps and range.
 
@@ -700,7 +706,7 @@ def retarget_frame(source_obj: Object, target_obj: Object, bone_map: "dict[str, 
         bpy.context.view_layer.update()
 
 
-def bake_retarget(
+def retarget_armature(
     source_obj: Object,
     target_obj: Object,
     bone_map: "dict[str, str]",
@@ -710,6 +716,11 @@ def bake_retarget(
     frame_end: int,
 ) -> int:
     """
+    **robot -> animation, rig to rig.**
+    Transfers an already-posed armature onto a differently-proportioned one (robot rig ->
+    character rig). The mirror of ``motion_retargeting.MotionRetargeting``, which goes the
+    other way by IK.
+
     Bake a source armature's motion onto a target armature, one keyframe per frame over
     ``[frame_start, frame_end]`` inclusive.
 
