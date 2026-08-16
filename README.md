@@ -78,6 +78,34 @@ blender ./character.blend --background --python ./scripts/blender/retarget_to_vr
 ```
 
 
+### Viewing without this package
+
+`mikumotion view` only resolves paths — the merging is done by the `rerun` binary, so any
+machine with `rerun` installed and a copy of the files can do it with no Python:
+
+```bash
+# rewrite the shared robot layer onto this motion's recording id, then merge
+rerun rrd route --recording-id lite_pro_tracking -o robot.rrd  motions/robot/lite_pro.rrd
+rerun rrd merge -o view.rrd  motions/base/lite_pro_tracking.rrd motions/preview/lite_pro_tracking.rrd robot.rrd
+
+rerun view.rrd motions/blueprints/lite_pro.rbl
+```
+
+Dropping the layer files straight into the viewer *almost* works: `base/` and `preview/`
+share a `recording_id`, so those two merge on their own and you get the body boxes and the
+joint plots. The robot layer is deliberately shared between motions, so it carries the
+robot's id instead and arrives as a second, separate recording — which is why its geometry
+does not follow the motion until it has been routed. Rerun composes data only within one
+recording.
+
+The route step needs `-o`: `rerun rrd route` writes to stdout and `rerun rrd merge` reads
+stdin, but merge only reads stdin when it is given no file arguments, so the two cannot be
+piped together here.
+
+`view.rrd` is self-contained, so it is also the thing to hand to someone who should not
+have to run anything at all.
+
+
 ## General Workflow
 
 1. Create a Blender project and import the source motion. Adjust the animation in Blender to match the target policy frequency (typically 50 Hz).
