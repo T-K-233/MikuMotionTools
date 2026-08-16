@@ -41,6 +41,7 @@ from .math import euler_zyx_to_quat, quat_mul
 
 APP_ID = "mikumotion"
 TIMELINE = "frame"
+BODY_BOX_SIZE = (0.02, 0.02, 0.02)  # how big each body is drawn when there is no robot mesh
 
 #: The per-frame arrays a motion is made of. Single source of truth for copying and storage.
 ARRAY_FIELDS = (
@@ -184,10 +185,17 @@ def quat_to_wxyz(quat_xyzw):
 
 
 def motion_blueprint():
-    """Viewer layout: the robot in 3D beside its joint-angle plots, with the timeline open."""
+    """
+    Viewer layout: the robot in 3D beside its joint-angle plots, with the timeline open.
+
+    Velocities are excluded from the 3D view. They are stored as vectors without origins,
+    so drawing them would fan every arrow out of the world origin; they remain in the
+    recording as data and can be switched on from the entity tree.
+    """
     return rrb.Blueprint(
         rrb.Horizontal(
-            rrb.Spatial3DView(origin="/", name="robot"),
+            rrb.Spatial3DView(origin="/", name="robot",
+                              contents=["+ $origin/**", "- /velocities/**"]),
             rrb.TimeSeriesView(origin="/signals/joint", name="joint angles"),
             column_shares=[3, 1],
         ),
@@ -301,8 +309,14 @@ class MotionStore:
             bodies_per_frame = [motion.num_bodies] * motion.num_frames
             joints_per_frame = [motion.num_joints] * motion.num_frames
 
-            rr.send_columns("/bodies", [frames], rr.InstancePoses3D.columns(
-                translations=motion.body_positions.reshape(-1, 3),
+            # Bodies are boxes rather than bare poses so the motion is visible on its own:
+            # an InstancePoses3D only re-poses geometry logged elsewhere, so a motion file
+            # opened without its robot layer would render an empty scene. The size is static.
+            rr.log("/bodies", rr.Boxes3D(half_sizes=[BODY_BOX_SIZE] * motion.num_bodies,
+                                         labels=motion.body_names),
+                   static=True, recording=stream)
+            rr.send_columns("/bodies", [frames], rr.Boxes3D.columns(
+                centers=motion.body_positions.reshape(-1, 3),
                 quaternions=quat_to_xyzw(motion.body_rotations).reshape(-1, 4),
             ).partition(bodies_per_frame), recording=stream)
 
@@ -376,14 +390,14 @@ class MotionStore:
 
         bodies = columns["/bodies"]
         motion = MotionSequence(
-            num_frames=len(bodies["translations"]),
+            num_frames=len(bodies["centers"]),
             # a motion exported from a mocap armature has bodies but no joints, and an
             # empty name list is not written at all, so treat it as absent
             joint_names=[str(value) for value in properties.get("joint_names", [])],
             body_names=[str(value) for value in properties["body_names"]],
             fps=int(properties["fps"][0]),
         )
-        motion.body_positions[:] = bodies["translations"]
+        motion.body_positions[:] = bodies["centers"]
         motion.body_rotations[:] = quat_to_wxyz(bodies["quaternions"])
         motion.body_linear_velocities[:] = columns["/velocities/linear"]["vectors"]
         motion.body_angular_velocities[:] = columns["/velocities/angular"]["vectors"]
