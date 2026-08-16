@@ -37,6 +37,9 @@ all = [
     "mikumotion[dev]",
 ]
 
+[project.scripts]
+mikumotion = "mikumotion.cli:main"
+
 [project.urls]
 Source = "https://github.com/T-K-233/MikuMotionTools"
 Tracker = "https://github.com/T-K-233/MikuMotionTools/issues"

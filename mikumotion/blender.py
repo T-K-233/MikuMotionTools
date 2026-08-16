@@ -217,11 +217,11 @@ def build_body_motion_data(
 
             # bone position is defined by the head
             bone_position: Vector = source_bone.head.copy()
-            motion._body_positions[frame, idx, :] = bone_position
+            motion.body_positions[frame, idx, :] = bone_position
 
             # get the rotation offset in (w, x, y, z) quaternion
             bone_rotation: Quaternion = source_bone.matrix.to_quaternion().copy()
-            motion._body_rotations[frame, idx, :] = bone_rotation
+            motion.body_rotations[frame, idx, :] = bone_rotation
 
             body_rotations_euler[frame, idx, :] = bone_rotation.to_euler()
 
@@ -229,22 +229,22 @@ def build_body_motion_data(
 
     # === post-process motion data ===
     # cancel first frame global offset
-    offset_x = np.mean(motion._body_positions[0, :, 0])
-    offset_y = np.mean(motion._body_positions[0, :, 1])
-    motion._body_positions[:, :, 0] -= offset_x
-    motion._body_positions[:, :, 1] -= offset_y
+    offset_x = np.mean(motion.body_positions[0, :, 0])
+    offset_y = np.mean(motion.body_positions[0, :, 1])
+    motion.body_positions[:, :, 0] -= offset_x
+    motion.body_positions[:, :, 1] -= offset_y
 
     # calculate velocities
-    motion._body_linear_velocities[1:] = np.diff(motion._body_positions, axis=0) / (1. / fps_float)
+    motion.body_linear_velocities[1:] = np.diff(motion.body_positions, axis=0) / (1. / fps_float)
 
     # calculate angular velocities
     # handle euler angle discontinuity
     # TODO: this is not quite correct, we need to use quaternions to calculate angular velocities
     body_rotations_euler = np.unwrap(body_rotations_euler, axis=0)
-    motion._body_angular_velocities[1:] = np.diff(body_rotations_euler, axis=0) / (1. / fps_float)
+    motion.body_angular_velocities[1:] = np.diff(body_rotations_euler, axis=0) / (1. / fps_float)
 
     # handle euler angle wrapping
-    motion._body_angular_velocities = np.unwrap(motion._body_angular_velocities, axis=0)
+    motion.body_angular_velocities[:] = np.unwrap(motion.body_angular_velocities, axis=0)
 
     print(f"Done generating {n_frames} frames ({n_frames / fps_float:.2f} seconds)")
 
@@ -662,10 +662,9 @@ def load_motion_to_armature(
     body_index = {n: motion.body_names.index(n) for n in drive_names}
     identity = Matrix.Identity(4)
 
-    motion_fps = int(np.asarray(motion.fps).reshape(-1)[0])
     frames = list(range(0, motion.num_frames, max(1, frame_stride)))
     if set_scene_range:
-        set_scene_fps(max(1, int(round(motion_fps / max(1, frame_stride)))))
+        set_scene_fps(max(1, int(round(motion.fps / max(1, frame_stride)))))
         set_scene_animation_range(frame_start, frame_start + len(frames) - 1)
 
     for out_i, f in enumerate(frames):
@@ -701,7 +700,7 @@ def load_motion_to_armature(
 
     print(f"\n[motion] keyframed {len(frames)} frames onto '{armature.name}' "
           f"({len(drive_names)} bones), scene {frame_start}..{frame_start + len(frames) - 1} "
-          f"@ {C.scene.render.fps}fps (motion {motion_fps}fps)")
+          f"@ {C.scene.render.fps}fps (motion {motion.fps}fps)")
     return len(frames)
 
 

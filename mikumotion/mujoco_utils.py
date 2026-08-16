@@ -1,7 +1,5 @@
 import mujoco
 
-from mikumotion.motion_sequence import MotionSequence
-
 
 def create_empty_scene(show_world_frame: bool = False) -> str:
     """

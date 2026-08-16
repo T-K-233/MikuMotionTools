@@ -1,11 +1,30 @@
-import os
-
 import numpy as np
+
+from .math import quat_from_euler_zyx, quat_mul
 
 
 class MotionSequence:
     """
-    A sequence of motion data.
+    A sequence of motion data: joint and body trajectories, all in world frame.
+
+    This is the central data structure of MikuMotionTools — every other module is a
+    converter into or out of it. It is a plain mutable container: producers allocate one
+    and fill the arrays in place. Persistence lives in :mod:`mikumotion.rrd_io`, which
+    reads and writes it as a Rerun ``.rrd``.
+
+    Fields, for ``F`` frames, ``D`` joints and ``B`` bodies:
+
+    ==========================  ==========  ==================================================
+    ``fps``                     int         frame rate
+    ``joint_names``             D           joint names
+    ``body_names``              B           link names
+    ``joint_positions``         (F, D)      joint angles, rad
+    ``joint_velocities``        (F, D)      joint angular velocities, rad/s
+    ``body_positions``          (F, B, 3)   link positions in world frame, m
+    ``body_rotations``          (F, B, 4)   link rotations in world frame, (qw, qx, qy, qz)
+    ``body_linear_velocities``  (F, B, 3)   link linear velocities in world frame, m/s
+    ``body_angular_velocities`` (F, B, 3)   link angular velocities in world frame, rad/s
+    ==========================  ==========  ==================================================
 
     Modified from Isaac Lab's motion_loader.py:
     https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab_tasks/isaaclab_tasks/direct/humanoid_amp/motions/motion_loader.py
@@ -15,358 +34,91 @@ class MotionSequence:
     (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
     SPDX-License-Identifier: BSD-3-Clause
 
-    This class is modified to use numpy instead of torch to load the motion data,
-    suitable for CPU-only environment.
+    This class is modified to use numpy instead of torch, suitable for a CPU-only
+    environment, and to store its arrays as plain public attributes.
     """
 
-    @classmethod
-    def load(cls, path: str) -> "MotionSequence":
-        """Load a motion file and return a MotionSequence object.
+    def __init__(self, num_frames, joint_names, body_names, fps=50):
+        self.fps = int(fps)
+        self.joint_names = list(joint_names)
+        self.body_names = list(body_names)
 
-        Args:
-            path: Motion file path to load.
+        num_joints = len(self.joint_names)
+        num_bodies = len(self.body_names)
 
-        Raises:
-            AssertionError: If the specified motion file doesn't exist.
-        """
-        assert os.path.isfile(path), f"Invalid file path: {path}"
-        data = np.load(path)
+        self.joint_positions = np.zeros((num_frames, num_joints), dtype=np.float32)
+        self.joint_velocities = np.zeros((num_frames, num_joints), dtype=np.float32)
+        self.body_positions = np.zeros((num_frames, num_bodies, 3), dtype=np.float32)
+        self.body_rotations = np.zeros((num_frames, num_bodies, 4), dtype=np.float32)
+        self.body_linear_velocities = np.zeros((num_frames, num_bodies, 3), dtype=np.float32)
+        self.body_angular_velocities = np.zeros((num_frames, num_bodies, 3), dtype=np.float32)
 
-        num_frames = np.max([data["joint_positions"].shape[0], data["body_positions"].shape[0]])
+        self.body_rotations[:, :, 0] = 1.0  # identity quaternion
 
-        motion = cls(
-            num_frames=num_frames,
-            joint_names=data["joint_names"].tolist(),
-            body_names=data["body_names"].tolist(),
-            fps=data["fps"],
-        )
-
-        motion._joint_positions[:] = data["joint_positions"]   # joint positions, rad
-        motion._joint_velocities[:] = data["joint_velocities"]   # joint velocities, rad/s
-        motion._body_positions[:] = data["body_positions"]   # link positions, m
-        motion._body_rotations[:] = data["body_rotations"]   # link rotations, (qw, qx, qy, qz) quaternion
-        motion._body_linear_velocities[:] = data["body_linear_velocities"]       # link linear velocities, m/s
-        motion._body_angular_velocities[:] = data["body_angular_velocities"]     # link angular velocities, rad/s
-
-        print(f"Motion loaded ({path}): duration: {motion._duration} sec, # of frames: {motion._num_frames}, FPS: {motion._fps}")
-
-        return motion
-
-    def __init__(self, num_frames: int, joint_names: list[str], body_names: list[str], fps: int = 50) -> None:
-        """Initialize a MotionSequence object.
-
-        Args:
-            num_frames: Number of frames.
-            joint_names: List of joint names.
-            body_names: List of rigid body names.
-            fps: the FPS of the motion data.
-        """
-        self._fps = fps                                         # frame rate
-        self._dt = 1.0 / self._fps                              # per frame time step, s
-        self._num_frames = num_frames                           # total number of frames
-        self._duration = self._dt * (self._num_frames - 1)      # duration, s
-        self._joint_names = joint_names                         # joint names
-        self._body_names = body_names                           # rigid body names
-
-        # joint positions, rad
-        self._joint_positions = np.zeros((self._num_frames, len(self._joint_names)), dtype=np.float32)
-        # joint velocities, rad/s
-        self._joint_velocities = np.zeros((self._num_frames, len(self._joint_names)), dtype=np.float32)
-        # link positions, m
-        self._body_positions = np.zeros((self._num_frames, len(self._body_names), 3), dtype=np.float32)
-        # link rotations, (qw, qx, qy, qz) quaternion
-        self._body_rotations = np.zeros((self._num_frames, len(self._body_names), 4), dtype=np.float32)
-        # link linear velocities, m/s
-        self._body_linear_velocities = np.zeros((self._num_frames, len(self._body_names), 3), dtype=np.float32)
-        # link angular velocities, rad/s
-        self._body_angular_velocities = np.zeros((self._num_frames, len(self._body_names), 3), dtype=np.float32)
-
-        # ensure correct default quaternion representation
-        self._body_rotations[:, :, 0] = 1.0
+    def __repr__(self):
+        return (f"MotionSequence({self.num_frames} frames, {self.num_joints} joints, "
+                f"{self.num_bodies} bodies, {self.fps} fps, {self.duration:.2f}s)")
 
     @property
-    def fps(self) -> int:
-        """Frames per second."""
-        return self._fps
+    def num_frames(self):
+        return self.body_positions.shape[0]
 
     @property
-    def dt(self) -> float:
-        """Time step."""
-        return self._dt
+    def num_joints(self):
+        return len(self.joint_names)
 
     @property
-    def num_frames(self) -> int:
-        """Number of frames."""
-        return self._num_frames
+    def num_bodies(self):
+        return len(self.body_names)
 
     @property
-    def duration(self) -> float:
-        """Duration."""
-        return self._duration
+    def duration(self):
+        """Length of the motion in seconds."""
+        return (self.num_frames - 1) / self.fps
 
-    @property
-    def joint_names(self) -> list[str]:
-        """Joint names."""
-        return self._joint_names
-
-    @property
-    def body_names(self) -> list[str]:
-        """Rigid body names."""
-        return self._body_names
-
-    @property
-    def num_joints(self) -> int:
-        """Number of joints."""
-        return len(self._joint_names)
-
-    @property
-    def num_bodies(self) -> int:
-        """Number of rigid bodies."""
-        return len(self._body_names)
-
-    @property
-    def joint_positions(self) -> np.ndarray:
-        """Joint positions."""
-        return self._joint_positions
-
-    @property
-    def joint_velocities(self) -> np.ndarray:
-        """Joint velocities."""
-        return self._joint_velocities
-
-    @property
-    def body_positions(self) -> np.ndarray:
-        """Rigid body positions."""
-        return self._body_positions
-
-    @property
-    def body_rotations(self) -> np.ndarray:
-        """Rigid body rotations."""
-        return self._body_rotations
-
-    @property
-    def body_linear_velocities(self) -> np.ndarray:
-        """Rigid body linear velocities."""
-        return self._body_linear_velocities
-
-    @property
-    def body_angular_velocities(self) -> np.ndarray:
-        """Rigid body angular velocities."""
-        return self._body_angular_velocities
-
-    def get_joint_indices(self, joint_names: list[str]) -> list[int]:
-        """Get joint indexes by joint names.
-
-        Args:
-            joint_names: List of joint names.
-
-        Raises:
-            AssertionError: If the specified joint name doesn't exist.
-
-        Returns:
-            List of joint indexes.
-        """
-        indexes = []
-        for name in joint_names:
-            assert name in self._joint_names, f"The specified joint name ({name}) doesn't exist in {self._joint_names}"
-            indexes.append(self._joint_names.index(name))
-        return indexes
-
-    def get_body_indices(self, body_names: list[str]) -> list[int]:
-        """Get rigid body indexes by rigid body names.
-
-        Args:
-            body_names: List of rigid body names.
-
-        Raises:
-            AssertionError: If the specified rigid body name doesn't exist.
-
-        Returns:
-            List of rigid body indexes.
-        """
-        indexes = []
+    def get_body_indices(self, body_names):
+        """Indices of the named bodies, in the order given."""
         for name in body_names:
-            assert name in self._body_names, f"The specified body name ({name}) doesn't exist in {self._body_names}"
-            indexes.append(self._body_names.index(name))
-        return indexes
+            assert name in self.body_names, f"unknown body {name!r}, have {self.body_names}"
+        return [self.body_names.index(name) for name in body_names]
 
-    def get_frames(
-        self,
-        frames: int | list[int] | np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Get motion data by frame indices.
-        This function will automatically clip the frame indices to the valid range. If the frame indices are out of range,
-        the function will return the data of last frame (as upper bound) or first frame (as lower bound).
-
-        Args:
-            frames: List of frame indices to sample.
-
-        Returns:
-            Motion joint positions (with shape (N, num_dofs)), joint velocities (with shape (N, num_dofs)),
-            rigid body positions (with shape (N, num_bodies, 3)), rigid body rotations (with shape (N, num_bodies, 4), as wxyz quaternion),
-            rigid body linear velocities (with shape (N, num_bodies, 3)) and rigid body angular velocities (with shape (N, num_bodies, 3)).
-        """
-        frames = np.clip(frames, 0, self._num_frames - 1)
-
-        return (
-            self._joint_positions[frames],
-            self._joint_velocities[frames],
-            self._body_positions[frames],
-            self._body_rotations[frames],
-            self._body_linear_velocities[frames],
-            self._body_angular_velocities[frames],
-        )
-
-    def save(self, path: str) -> None:
-        """Save the motion data to a file.
-
-        Args:
-            path: The path to the output file.
-        """
-        fps = np.array([self._fps], dtype=np.int64)  # this needs to be int64
-        joint_names = np.array(self._joint_names)
-        body_names = np.array(self._body_names)
-
-        np.savez(path,
-            fps=fps,
-            joint_names=joint_names,
-            body_names=body_names,
-            joint_positions=self._joint_positions,
-            joint_velocities=self._joint_velocities,
-            body_positions=self._body_positions,
-            body_rotations=self._body_rotations,
-            body_linear_velocities=self._body_linear_velocities,
-            body_angular_velocities=self._body_angular_velocities,
-        )
+    def copy(self):
+        """A deep copy, sharing no arrays with this sequence."""
+        other = MotionSequence(self.num_frames, self.joint_names, self.body_names, self.fps)
+        other.joint_positions[:] = self.joint_positions
+        other.joint_velocities[:] = self.joint_velocities
+        other.body_positions[:] = self.body_positions
+        other.body_rotations[:] = self.body_rotations
+        other.body_linear_velocities[:] = self.body_linear_velocities
+        other.body_angular_velocities[:] = self.body_angular_velocities
+        return other
 
 
-def rotate_motion(motion: MotionSequence, z_rotation: float) -> MotionSequence:
+def rotate_motion(motion, z_rotation):
     """
-    Rotate the motion data by a z-rotation amount.
+    Return a copy of ``motion`` rotated about the world Z axis by ``z_rotation`` radians.
 
-    Args:
-        motion: The motion sequence to rotate
-        z_rotation: Rotation angle around Z-axis in radians
-
-    Returns:
-        A new MotionSequence with rotated data
+    Joint angles are unaffected; everything expressed in world frame is rotated.
     """
-    from mikumotion.math import quat_mul, quat_from_euler_zyx
+    zero = np.zeros(1, dtype=np.float32)
+    rotation = quat_from_euler_zyx(zero, zero, np.array([z_rotation], dtype=np.float32))[0]
+    w, x, y, z = rotation
+    matrix = np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+        [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+    ], dtype=np.float32)
 
-    # Create a new motion sequence with the same structure
-    rotated_motion = MotionSequence(
-        num_frames=motion.num_frames,
-        joint_names=motion.joint_names,
-        body_names=motion.body_names,
-        fps=motion.fps
-    )
-
-    # Copy DOF data (joint angles don't need rotation)
-    rotated_motion._joint_positions[:] = motion._joint_positions
-    rotated_motion._joint_velocities[:] = motion._joint_velocities
-
-    # Create rotation quaternion for z-rotation
-    # Using ZYX convention: roll=0, pitch=0, yaw=z_rotation
-    rotation_quat = quat_from_euler_zyx(
-        np.array([0.0]),  # roll
-        np.array([0.0]),  # pitch
-        np.array([z_rotation])  # yaw
-    )[0]  # Extract single quaternion from array
-
-    # Rotate body positions
-    for frame_idx in range(motion.num_frames):
-        for body_idx in range(len(motion.body_names)):
-            # Convert position to homogeneous coordinates
-            pos = motion._body_positions[frame_idx, body_idx]
-
-            # Rotate position using quaternion
-            # For position rotation: new_pos = q * pos * q_conjugate
-            # But we can use a simpler approach with rotation matrix
-            # Convert quaternion to rotation matrix and apply
-            w, x, y, z = rotation_quat
-
-            # Rotation matrix from quaternion
-            R = np.array([
-                [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
-                [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
-                [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
-            ])
-
-            rotated_motion._body_positions[frame_idx, body_idx] = R @ pos
-
-    # Rotate body rotations (quaternions)
-    for frame_idx in range(motion.num_frames):
-        for body_idx in range(len(motion.body_names)):
-            # Get current body rotation
-            current_quat = motion._body_rotations[frame_idx, body_idx]
-
-            # Rotate quaternion: new_quat = rotation_quat * current_quat
-            rotated_quat = quat_mul(rotation_quat, current_quat)
-            rotated_motion._body_rotations[frame_idx, body_idx] = rotated_quat
-
-    # Rotate body linear velocities
-    for frame_idx in range(motion.num_frames):
-        for body_idx in range(len(motion.body_names)):
-            # Get current linear velocity
-            linear_vel = motion._body_linear_velocities[frame_idx, body_idx]
-
-            # Rotate linear velocity using the same rotation matrix
-            w, x, y, z = rotation_quat
-            R = np.array([
-                [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
-                [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
-                [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
-            ])
-
-            rotated_motion._body_linear_velocities[frame_idx, body_idx] = R @ linear_vel
-
-    # Rotate body angular velocities
-    for frame_idx in range(motion.num_frames):
-        for body_idx in range(len(motion.body_names)):
-            # Get current angular velocity
-            angular_vel = motion._body_angular_velocities[frame_idx, body_idx]
-
-            # Rotate angular velocity using the same rotation matrix
-            w, x, y, z = rotation_quat
-            R = np.array([
-                [1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)],
-                [2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)],
-                [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)]
-            ])
-
-            rotated_motion._body_angular_velocities[frame_idx, body_idx] = R @ angular_vel
-
-    return rotated_motion
+    rotated = motion.copy()
+    rotated.body_positions[:] = motion.body_positions @ matrix.T
+    rotated.body_linear_velocities[:] = motion.body_linear_velocities @ matrix.T
+    rotated.body_angular_velocities[:] = motion.body_angular_velocities @ matrix.T
+    rotated.body_rotations[:] = quat_mul(rotation, motion.body_rotations)
+    return rotated
 
 
-def translate_motion(motion: MotionSequence, translation: np.ndarray) -> MotionSequence:
-    """
-    Translate the motion data by a translation amount.
-    """
-    translated_motion = MotionSequence(
-        num_frames=motion.num_frames,
-        joint_names=motion.joint_names,
-        body_names=motion.body_names,
-        fps=motion.fps
-    )
-    translated_motion._joint_positions = motion._joint_positions
-    translated_motion._joint_velocities = motion._joint_velocities
-    translated_motion._body_positions = motion._body_positions + translation
-    translated_motion._body_rotations = motion._body_rotations
-    translated_motion._body_linear_velocities = motion._body_linear_velocities
-    translated_motion._body_angular_velocities = motion._body_angular_velocities
-    return translated_motion
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file", type=str, required=True, help="Motion file")
-    args, _ = parser.parse_known_args()
-
-    motion = MotionSequence(args.file)
-
-    print("- number of frames:", motion.num_frames)
-    print("- number of joints:", motion.num_joints)
-    print("- number of bodies:", motion.num_bodies)
+def translate_motion(motion, translation):
+    """Return a copy of ``motion`` shifted by ``translation`` (metres, world frame)."""
+    translated = motion.copy()
+    translated.body_positions[:] = motion.body_positions + translation
+    return translated

@@ -27,32 +27,27 @@ from .mcap_io import read_motion_mcap
 from .motion_sequence import MotionSequence
 
 
-def _quat_to_mat(q_wxyz: np.ndarray) -> np.ndarray:
-    """(w,x,y,z) quaternion -> 3x3 rotation matrix (via MuJoCo)."""
-    m = np.zeros(9, dtype=np.float64)
-    mujoco.mju_quat2Mat(m, np.asarray(q_wxyz, dtype=np.float64))
-    return m.reshape(3, 3)
+def pose_matrix(position: np.ndarray, quat_wxyz: np.ndarray) -> np.ndarray:
+    """A 4x4 homogeneous transform from a position and a (w, x, y, z) quaternion."""
+    rotation = np.zeros(9, dtype=np.float64)
+    mujoco.mju_quat2Mat(rotation, np.asarray(quat_wxyz, dtype=np.float64))
+
+    transform = np.eye(4, dtype=np.float64)
+    transform[:3, :3] = rotation.reshape(3, 3)
+    transform[:3, 3] = position
+    return transform
 
 
-def _mat_to_quat(R: np.ndarray) -> np.ndarray:
-    """3x3 rotation matrix -> (w,x,y,z) quaternion (via MuJoCo)."""
-    q = np.zeros(4, dtype=np.float64)
-    mujoco.mju_mat2Quat(q, np.ascontiguousarray(R, dtype=np.float64).reshape(9))
-    return q
-
-
-def _make_tf(pos: np.ndarray, quat_wxyz: np.ndarray) -> np.ndarray:
-    """Build a 4x4 homogeneous transform from position + (w,x,y,z) quaternion."""
-    T = np.eye(4, dtype=np.float64)
-    T[:3, :3] = _quat_to_mat(quat_wxyz)
-    T[:3, 3] = pos
-    return T
+def matrix_to_quat(rotation: np.ndarray) -> np.ndarray:
+    """A (w, x, y, z) quaternion from a 3x3 rotation matrix."""
+    quat = np.zeros(4, dtype=np.float64)
+    mujoco.mju_mat2Quat(quat, np.ascontiguousarray(rotation, dtype=np.float64).reshape(9))
+    return quat
 
 
 def motion_from_policy_log(
     mcap_path: str,
     mjcf_path: str,
-    *,
     base_body: str = "pelvis",
 ) -> MotionSequence:
     """Build a :class:`MotionSequence` (per-link world poses) from an mcap motion log.
@@ -128,29 +123,28 @@ def motion_from_policy_log(
         mujoco.mj_kinematics(model, data)
 
         # pelvis (base) FK pose, and the composed world base transform
-        T_base = _make_tf(base_pos[f], base_quat[f])
-        pelvis_fk = _make_tf(data.xpos[base_id], data.xquat[base_id])
+        T_base = pose_matrix(base_pos[f], base_quat[f])
+        pelvis_fk = pose_matrix(data.xpos[base_id], data.xquat[base_id])
         pelvis_fk_inv = np.linalg.inv(pelvis_fk)
 
         for k, b in enumerate(body_ids):
-            body_fk = _make_tf(data.xpos[b], data.xquat[b])
+            body_fk = pose_matrix(data.xpos[b], data.xquat[b])
             W = T_base @ pelvis_fk_inv @ body_fk
-            motion._body_positions[f, k, :] = W[:3, 3]
-            motion._body_rotations[f, k, :] = _mat_to_quat(W[:3, :3])
+            motion.body_positions[f, k, :] = W[:3, 3]
+            motion.body_rotations[f, k, :] = matrix_to_quat(W[:3, :3])
 
         # joint angles/velocities in model order
-        motion._joint_positions[f, valid] = log_qpos[f, lcol[valid]]
-        if log_qvel is not None:
-            motion._joint_velocities[f, valid] = log_qvel[f, lcol[valid]]
+        motion.joint_positions[f, valid] = log_qpos[f, lcol[valid]]
+        motion.joint_velocities[f, valid] = log_qvel[f, lcol[valid]]
 
         if f % 500 == 0:
             print(f"[fk] frame {f}/{n}", end="\r")
 
     # ---- finite-difference body velocities (world frame) ----
-    pos = motion._body_positions
-    motion._body_linear_velocities[1:] = (pos[1:] - pos[:-1]) / dt
+    pos = motion.body_positions
+    motion.body_linear_velocities[1:] = (pos[1:] - pos[:-1]) / dt
 
-    rot = motion._body_rotations
+    rot = motion.body_rotations
     # angular velocity from consecutive quaternions: dq = q_next * conj(q_prev)
     qn = rot[1:].reshape(-1, 4)
     qp = rot[:-1].reshape(-1, 4)
@@ -168,21 +162,7 @@ def motion_from_policy_log(
     s = np.sqrt(np.maximum(1.0 - dq_w * dq_w, 1e-12))
     axis = dq[:, 1:] / s[:, None]
     omega = (axis * (angle / dt)[:, None]).reshape(rot.shape[0] - 1, nb, 3)
-    motion._body_angular_velocities[1:] = omega
+    motion.body_angular_velocities[1:] = omega
 
-    print(f"\n[fk] built MotionSequence: {n} frames, {nb} bodies, {len(model_joint_names)} joints, {fps} fps")
+    print(f"\n[fk] built {motion!r}")
     return motion
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Motion log (.mcap) -> MotionSequence (.npz) via MuJoCo FK.")
-    parser.add_argument("--mcap", type=str, required=True)
-    parser.add_argument("--mjcf", type=str, required=True)
-    parser.add_argument("--out", type=str, required=True)
-    args = parser.parse_args()
-
-    m = motion_from_policy_log(args.mcap, args.mjcf)
-    m.save(args.out)
-    print("saved:", args.out)

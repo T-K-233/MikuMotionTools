@@ -7,6 +7,11 @@ from tqdm import tqdm
 
 from mikumotion.motion_sequence import MotionSequence
 from mikumotion.mujoco_utils import add_body_frames
+from mikumotion.rrd_io import MotionStore
+
+SOLVER = "daqp"
+DAMPING = 0.5
+MAX_ITER = 40
 
 
 class MotionRetargeting:
@@ -52,24 +57,15 @@ class MotionRetargeting:
         damping: The damping factor for the inverse kinematics.
         max_iter: The maximum number of iterations for the inverse kinematics.
     """
-    def __init__(
-        self,
-        motion_file: str,
-        robot_xml: str,
-        solver: str = "daqp",
-        damping: float = 0.5,
-        max_iter: int = 40,
-    ):
-        self.motion_file = motion_file
+    def __init__(self, motion_name: str, robot_xml: str, store: MotionStore):
+        self.motion_name = motion_name
         self.robot_xml = robot_xml
-        self.solver = solver
-        self.damping = damping
-        self.max_iter = max_iter
+        self.store = store
 
         # load the source motion
-        self.source_motion = MotionSequence.load(self.motion_file)
+        self.source_motion = store.read_motion(motion_name)
         self.num_frames = self.source_motion.num_frames
-        self.fps = self.source_motion.fps[0]
+        self.fps = self.source_motion.fps
 
         pose_targets = {
             "pelvis": "pelvis",
@@ -200,8 +196,8 @@ class MotionRetargeting:
             configuration=self.configuration,
             tasks=self.tasks,
             dt=dt,
-            solver=self.solver,
-            damping=self.damping,
+            solver=SOLVER,
+            damping=DAMPING,
             limits=self.limits,
         )
         self.configuration.integrate_inplace(vel, dt)
@@ -241,7 +237,7 @@ class MotionRetargeting:
 
             error = self.solve_ik()
             while prev_error - error > 0.0001:
-                if num_iter >= self.max_iter:
+                if num_iter >= MAX_ITER:
                     print(f"Maximum number of iterations reached for frame {frame_idx}")
                     break
                 prev_error = error
@@ -252,23 +248,23 @@ class MotionRetargeting:
             mujoco.mj_forward(self.model, self.data)
 
             # store the joint motion data
-            self.target_motion._joint_positions[frame_idx, :] = self.data.qpos[7:]
+            self.target_motion.joint_positions[frame_idx, :] = self.data.qpos[7:]
 
-            # extract body data from the MuJoCo robot after IK solving
-            for i, body_name in enumerate(self.retargeted_bodies):
-                mapping_entry = self.mapping_table[body_name]
-                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, mapping_entry["target"])
+            # extract body data from the MuJoCo robot after IK solving. target_motion's
+            # body_names are retargeted_bodies' values, so iterating it keeps them aligned.
+            for i, target_body_name in enumerate(self.retargeted_bodies.values()):
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, target_body_name)
 
                 # body position and rotation in world frame
-                self.target_motion._body_positions[frame_idx, i, :] = self.data.xpos[body_id]
-                self.target_motion._body_rotations[frame_idx, i, :] = self.data.xquat[body_id]
+                self.target_motion.body_positions[frame_idx, i, :] = self.data.xpos[body_id]
+                self.target_motion.body_rotations[frame_idx, i, :] = self.data.xquat[body_id]
 
                 # body linear and angular velocities in world frame
                 velocity = np.empty(6)
                 is_local = False
                 mujoco.mj_objectVelocity(self.model, self.data, mujoco.mjtObj.mjOBJ_XBODY, body_id, velocity, is_local)
-                self.target_motion._body_linear_velocities[frame_idx, i, :] = velocity[3:6]
-                self.target_motion._body_angular_velocities[frame_idx, i, :] = velocity[0:3]
+                self.target_motion.body_linear_velocities[frame_idx, i, :] = velocity[3:6]
+                self.target_motion.body_angular_velocities[frame_idx, i, :] = velocity[0:3]
 
             # visualize at fixed FPS
             self.viewer.sync()
@@ -276,10 +272,10 @@ class MotionRetargeting:
                 self.rate.sleep()
 
         # compute the velocities
-        self.target_motion._joint_velocities[1:] = np.diff(self.target_motion._joint_positions, axis=0) / (1. / self.fps)
+        self.target_motion.joint_velocities[1:] = np.diff(self.target_motion.joint_positions, axis=0) * self.fps
 
         self.viewer.close()
 
-        motion_file_out = self.motion_file.replace(".npz", "_retargeted.npz")
-        self.target_motion.save(motion_file_out)
-        print(f"Results saved to {motion_file_out}")
+        retargeted_name = f"{self.motion_name}_retargeted"
+        self.store.write_motion(retargeted_name, self.target_motion)
+        print(f"Results saved to {self.store.motion_file(retargeted_name)}")
