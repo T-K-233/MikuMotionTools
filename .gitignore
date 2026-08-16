@@ -210,5 +210,7 @@ data/robots/
 
 # Motion data and render outputs (large, regenerable from the pipeline)
 *.npz
+*.rrd
+*.rbl
 *.mp4
 renders/
