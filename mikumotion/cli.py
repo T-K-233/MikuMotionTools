@@ -44,11 +44,11 @@ def compose_for_viewing(store, name, destination):
 
 
 def run_import(args):
-    from .forward_kinematics import motion_from_robot_log
+    from .forward_kinematics import robot_log_to_motion
 
     store = MotionStore(args.root)
     name = args.name or Path(args.mcap).stem
-    motion = motion_from_robot_log(args.mcap, args.mjcf)
+    motion = robot_log_to_motion(args.mcap, args.mjcf)
     store.write_motion(name, motion)
     store.write_preview(name, motion, args.urdf)
     print(f"{name}: {motion!r}")
@@ -66,10 +66,10 @@ def run_view(args):
 
 
 def run_retarget(args):
-    from .motion_retargeting import MotionRetargeting
+    from .motion_retargeting import MotionRetargetingIK
 
     store = MotionStore(args.root)
-    MotionRetargeting(args.name, args.mjcf, store).run(args.realtime)
+    MotionRetargetingIK(args.name, args.mjcf, store).run(args.realtime)
 
 
 def run_list(args):

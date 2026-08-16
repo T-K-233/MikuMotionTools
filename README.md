@@ -33,15 +33,17 @@ uv sync --extra examples
 
 ## The two directions
 
-Everything is named by which side of the hub it is on: **`motion_from_X`** produces a motion, **`X_from_motion`** consumes one. The two pipelines mirror each other step for step:
+Conversions are named **`a_to_b`**, so a name reads as the transformation it performs and inverses pair up on sight: `armature_to_motion` against `motion_to_armature`. `from_` is reserved for constructors that build the thing they are called on — `RobotModel.from_file(path)` — and methods that convert what they belong to use `to_`, as in `robot.to_armature_tree()`.
+
+The two pipelines mirror each other step for step:
 
 | Step | animation → robot | robot → animation |
 |---|---|---|
 | 1. read the source | *(Blender opens the .blend)* | `mcap_io.read_robot_log` |
-| 2. **into the hub** | `blender.motion_from_armature` | `forward_kinematics.motion_from_robot_log` |
+| 2. **into the hub** | `blender.armature_to_motion` | `forward_kinematics.robot_log_to_motion` |
 | 3. store | `MotionStore.write_motion` | `MotionStore.write_motion` |
-| 4. retarget | `MotionRetargeting` — IK solves the robot's joints | `blender.retarget_armature` — bakes the robot rig onto a character rig |
-| 5. **out of the hub** | *(the robot's joints are the product)* | `blender.armature_from_motion` |
+| 4. retarget | `MotionRetargetingIK` — IK solves the robot's joints | `blender.retarget_armature` — bakes the robot rig onto a character rig |
+| 5. **out of the hub** | *(the robot's joints are the product)* | `blender.motion_to_armature` |
 | entry point | `scripts/blender/export_mocap.py` | `scripts/blender/animate_robot.py`, `retarget_to_vrm.py` |
 
 Reading it across a row tells you which step corresponds to which; reading down a column is one pipeline. Step 4 is where the directions genuinely differ: going *to* a robot needs IK, because a character's limb proportions do not map onto a robot's joints, while coming *from* a robot only needs a rotation transfer.

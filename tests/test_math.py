@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mikumotion.math import quat_from_euler_xyz
+from mikumotion.math import euler_xyz_to_quat
 from mikumotion.motion_sequence import MotionSequence, rotate_motion, translate_motion
 
 X30, Y60, Z90 = np.deg2rad(30), np.deg2rad(60), np.deg2rad(90)
@@ -22,8 +22,8 @@ X30, Y60, Z90 = np.deg2rad(30), np.deg2rad(60), np.deg2rad(90)
     (Z90, 0, Z90, [0.5, 0.5, -0.5, 0.5]),
     (Z90, 0, -Z90, [0.5, 0.5, 0.5, -0.5]),
 ])
-def test_quat_from_euler_xyz(roll, pitch, yaw, expected):
-    np.testing.assert_allclose(quat_from_euler_xyz(roll, pitch, yaw), expected, atol=1e-3)
+def test_euler_xyz_to_quat(roll, pitch, yaw, expected):
+    np.testing.assert_allclose(euler_xyz_to_quat(roll, pitch, yaw), expected, atol=1e-3)
 
 
 def build_motion():

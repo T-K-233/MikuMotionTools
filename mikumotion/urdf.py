@@ -16,7 +16,7 @@ URDF convention notes:
       parent link frame at zero joint position.
     - ``rpy`` is a fixed-axis (extrinsic XYZ) rotation, i.e. the rotation matrix
       is ``R = Rz(yaw) @ Ry(pitch) @ Rx(roll)``. This matches
-      ``mikumotion.math.quat_from_euler_xyz``.
+      ``mikumotion.math.euler_xyz_to_quat``.
     - A revolute joint rotates about ``<axis>``, expressed in the (child) joint
       frame.
 """

@@ -49,8 +49,8 @@ def main():
     # the robot rig is only a carrier for the motion, so it needs no meshes
     robot = urdf.RobotModel.from_file(args.urdf)
     tree = robot.to_armature_tree()
-    source = blender.build_robot_from_urdf(robot, name="retarget_source", with_meshes=False)
-    blender.armature_from_motion(motion, source, tree)
+    source = blender.robot_model_to_armature(robot, name="retarget_source", with_meshes=False)
+    blender.motion_to_armature(motion, source, tree)
 
     root_target, root_source = presets.LITE_PRO_TO_VROID_TRANSLATION_ROOT
     blender.retarget_armature(

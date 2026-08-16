@@ -1,7 +1,7 @@
 """
 **robot -> animation, step 1 of 2: into the hub.**
 Converts a robot log into a motion; the mirror of
-:func:`mikumotion.blender.motion_from_armature`, which does the same job for direction 1.
+:func:`mikumotion.blender.armature_to_motion`, which does the same job for direction 1.
 
 Convert a policy/tracking motion log (joint angles + floating-base pose) into a
 :class:`~mikumotion.motion_sequence.MotionSequence` of **per-link world poses** via
@@ -49,7 +49,7 @@ def matrix_to_quat(rotation: np.ndarray) -> np.ndarray:
     return quat
 
 
-def motion_from_robot_log(
+def robot_log_to_motion(
     mcap_path: str,
     mjcf_path: str,
     base_body: str = "pelvis",

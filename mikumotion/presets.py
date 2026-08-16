@@ -1396,10 +1396,10 @@ LITE_PRO_TO_VROID_TRANSLATION_ROOT = ("J_Bip_C_Hips", "pelvis")
 
 # vrm finger name -> robot finger index (finger1 is the thumb: offset toward +x,
 # nearest the wrist; finger3 the longest = middle; finger5 the shortest = little)
-_VROID_FINGERS = {"Thumb": 1, "Index": 2, "Middle": 3, "Ring": 4, "Little": 5}
+VROID_FINGERS = {"Thumb": 1, "Index": 2, "Middle": 3, "Ring": 4, "Little": 5}
 
 
-def _build_lite_pro_to_vroid_bone_map() -> "dict[str, str]":
+def build_lite_pro_to_vroid_bone_map() -> "dict[str, str]":
     m = {
         # spine + head (torso chain: pelvis -> waist_yaw -> waist_roll -> chest)
         "J_Bip_C_Hips": "pelvis",          # translation root
@@ -1419,10 +1419,10 @@ def _build_lite_pro_to_vroid_bone_map() -> "dict[str, str]":
         m[f"J_Bip_{v}_LowerLeg"] = f"{r}_knee_pitch"
         m[f"J_Bip_{v}_Foot"] = f"{r}_foot"
         # fingers
-        for vf, rn in _VROID_FINGERS.items():
+        for vf, rn in VROID_FINGERS.items():
             for k in (1, 2, 3):
                 m[f"J_Bip_{v}_{vf}{k}"] = f"{r}_finger{rn}_j{k}"
     return m
 
 
-LITE_PRO_TO_VROID_BONE_MAP = _build_lite_pro_to_vroid_bone_map()
+LITE_PRO_TO_VROID_BONE_MAP = build_lite_pro_to_vroid_bone_map()

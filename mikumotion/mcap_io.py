@@ -1,6 +1,6 @@
 """
 **robot -> animation, ingest.** Decodes the log that
-:func:`mikumotion.forward_kinematics.motion_from_robot_log` turns into a motion.
+:func:`mikumotion.forward_kinematics.robot_log_to_motion` turns into a motion.
 
 Read a robot-motion log from an ``.mcap`` file into plain numpy arrays.
 

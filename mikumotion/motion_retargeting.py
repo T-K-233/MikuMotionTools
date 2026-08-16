@@ -13,13 +13,13 @@ DAMPING = 0.5
 MAX_ITER = 40
 
 
-class MotionRetargeting:
+class MotionRetargetingIK:
     """
     **animation -> robot, step 2 of 2: hub to hub.**
     Solves a robot's joints for a character motion, by IK. The mirror of
     :func:`mikumotion.blender.retarget_armature`, which retargets the other way.
 
-    The MotionRetargeting logic.
+    The MotionRetargetingIK logic.
 
     It takes in a mapping table, a source motion file, and a target model file.
     It then retargets the source motion to the target model.

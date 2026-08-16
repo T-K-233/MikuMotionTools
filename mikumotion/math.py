@@ -4,7 +4,7 @@
 import numpy as np
 
 
-def quat_from_euler_xyz(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> np.ndarray:
+def euler_xyz_to_quat(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> np.ndarray:
     """Convert rotations given as Euler angles in radians to Quaternions.
 
     Note:
@@ -34,7 +34,7 @@ def quat_from_euler_xyz(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) ->
     return np.stack([qw, qx, qy, qz], axis=-1)
 
 
-def quat_from_euler_zyx(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> np.ndarray:
+def euler_zyx_to_quat(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> np.ndarray:
     """Convert rotations given as Euler angles in radians to Quaternions.
 
     Note:

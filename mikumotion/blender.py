@@ -76,7 +76,7 @@ def set_armature_to_pose(armature: Object) -> None:
     armature.data.pose_position = "POSE"
 
 
-def motion_from_armature(
+def armature_to_motion(
     armature: Object,
     bone_names: list[str],
     blender_bone_postfix: str = ".frame",
@@ -84,7 +84,7 @@ def motion_from_armature(
     """
     **animation -> robot, step 1 of 2: into the hub.**
     Reads a Blender armature's animation as a motion; the mirror of
-    ``forward_kinematics.motion_from_robot_log``, and the inverse of ``armature_from_motion``.
+    ``forward_kinematics.robot_log_to_motion``, and the inverse of ``motion_to_armature``.
 
     Build rigid body motion data from the source armature.
     The joint motion data is not included in this function, and will be initialized
@@ -169,7 +169,7 @@ def motion_from_armature(
     return motion
 
 
-def matrix_from_translation_rotation(
+def translation_rotation_to_matrix(
     translation: np.ndarray = np.zeros((3,), dtype=np.float32),
     rotation: np.ndarray = np.array([1, 0, 0, 0], dtype=np.float32),
 ) -> Matrix:
@@ -248,7 +248,7 @@ def build_armature(
 
     for body_index in range(tree.num_bodies):
         parent_index = parent_indices[body_index]
-        local_transform = matrix_from_translation_rotation(
+        local_transform = translation_rotation_to_matrix(
             tree.local_translations[body_index],
             tree.local_rotations[body_index],
         )
@@ -318,7 +318,7 @@ def armature_tree_world_transforms(tree: ArmatureTree) -> "dict[str, Matrix]":
 
     for body_index in range(tree.num_bodies):
         parent_index = parent_indices[body_index]
-        local_transform = matrix_from_translation_rotation(
+        local_transform = translation_rotation_to_matrix(
             tree.local_translations[body_index],
             tree.local_rotations[body_index],
         )
@@ -411,7 +411,7 @@ def parent_object_to_bone(obj: Object, armature: Object, bone_name: str) -> None
 BONE_LENGTH = 0.05
 
 
-def build_robot_from_urdf(robot: RobotModel, name: str, with_meshes: bool) -> Object:
+def robot_model_to_armature(robot: RobotModel, name: str, with_meshes: bool) -> Object:
     """
     Build a Blender armature (one bone per link) and the visual meshes for a parsed URDF robot.
 
@@ -463,7 +463,7 @@ def build_robot_from_urdf(robot: RobotModel, name: str, with_meshes: bool) -> Ob
             obj_name = f"{link_name}_visual" if len(link.visuals) == 1 else f"{link_name}_visual_{vi}"
             obj = import_stl(visual.mesh_path, name=obj_name)
 
-            visual_local = matrix_from_translation_rotation(
+            visual_local = translation_rotation_to_matrix(
                 visual.origin_xyz,
                 rpy_to_quat(visual.origin_rpy),
             )
@@ -486,7 +486,7 @@ def build_robot_from_urdf(robot: RobotModel, name: str, with_meshes: bool) -> Ob
 # MOTION -> ARMATURE (drive the faithful rig from a MotionSequence)
 # ============================================================
 
-def armature_from_motion(
+def motion_to_armature(
     motion: MotionSequence,
     armature: Object,
     tree: ArmatureTree,
@@ -494,7 +494,7 @@ def armature_from_motion(
 ) -> int:
     """
     **robot -> animation, step 2 of 2: out of the hub.**
-    Plays a motion on a Blender armature; the inverse of ``motion_from_armature``.
+    Plays a motion on a Blender armature; the inverse of ``armature_to_motion``.
 
     Drive a faithful (one-bone-per-link) armature from a MotionSequence of per-link
     world poses, inserting a keyframe per frame and setting the scene's fps and range.
@@ -505,7 +505,7 @@ def armature_from_motion(
     pose is computed analytically as a per-bone ``matrix_basis`` from the world-space
     deltas, so no per-bone ``view_layer.update()`` is needed (keeps long sequences fast).
 
-    The armature must sit at the world origin (as built by ``build_robot_from_urdf``)
+    The armature must sit at the world origin (as built by ``robot_model_to_armature``)
     and its bones must be named by link (matching ``motion.body_names`` / ``tree``).
 
     Args:
@@ -551,7 +551,7 @@ def armature_from_motion(
         deltas: "dict[str, Matrix]" = {}
         for name in drive_names:
             idx = body_index[name]
-            m_anim = matrix_from_translation_rotation(
+            m_anim = translation_rotation_to_matrix(
                 motion.body_positions[f, idx],
                 motion.body_rotations[f, idx],
             )
@@ -718,7 +718,7 @@ def retarget_armature(
     """
     **robot -> animation, rig to rig.**
     Transfers an already-posed armature onto a differently-proportioned one (robot rig ->
-    character rig). The mirror of ``motion_retargeting.MotionRetargeting``, which goes the
+    character rig). The mirror of ``motion_retargeting.MotionRetargetingIK``, which goes the
     other way by IK.
 
     Bake a source armature's motion onto a target armature, one keyframe per frame over

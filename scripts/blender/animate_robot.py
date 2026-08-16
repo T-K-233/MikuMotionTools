@@ -43,8 +43,8 @@ def build_scene(motion, urdf_path):
 
     robot = urdf.RobotModel.from_file(urdf_path)
     tree = robot.to_armature_tree()
-    armature = blender.build_robot_from_urdf(robot, name=robot.name, with_meshes=True)
-    blender.armature_from_motion(motion, armature, tree)
+    armature = blender.robot_model_to_armature(robot, name=robot.name, with_meshes=True)
+    blender.motion_to_armature(motion, armature, tree)
     return armature
 
 

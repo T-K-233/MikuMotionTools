@@ -37,7 +37,7 @@ import pyarrow as pa
 import rerun as rr
 import rerun.blueprint as rrb
 
-from .math import quat_from_euler_zyx, quat_mul
+from .math import euler_zyx_to_quat, quat_mul
 
 APP_ID = "mikumotion"
 TIMELINE = "frame"
@@ -144,7 +144,7 @@ def rotate_motion(motion, z_rotation):
     Joint angles are unaffected; everything expressed in world frame is rotated.
     """
     zero = np.zeros(1, dtype=np.float32)
-    rotation = quat_from_euler_zyx(zero, zero, np.array([z_rotation], dtype=np.float32))[0]
+    rotation = euler_zyx_to_quat(zero, zero, np.array([z_rotation], dtype=np.float32))[0]
     w, x, y, z = rotation
     matrix = np.array([
         [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
