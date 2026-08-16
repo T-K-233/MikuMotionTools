@@ -241,18 +241,23 @@ class MotionStore:
         properties = read_properties(path)
         columns = read_entity_columns(path)
 
+        bodies = columns["/bodies"]
         motion = MotionSequence(
-            num_frames=len(columns["/signals/joint"]["scalars"]),
-            joint_names=[str(value) for value in properties["joint_names"]],
+            num_frames=len(bodies["translations"]),
+            # a motion exported from a mocap armature has bodies but no joints, and an
+            # empty name list is not written at all, so treat it as absent
+            joint_names=[str(value) for value in properties.get("joint_names", [])],
             body_names=[str(value) for value in properties["body_names"]],
             fps=int(properties["fps"][0]),
         )
-        motion.joint_positions[:] = columns["/signals/joint"]["scalars"]
-        motion.joint_velocities[:] = columns["/signals/joint_velocity"]["scalars"]
-        motion.body_positions[:] = columns["/bodies"]["translations"]
-        motion.body_rotations[:] = quat_to_wxyz(columns["/bodies"]["quaternions"])
+        motion.body_positions[:] = bodies["translations"]
+        motion.body_rotations[:] = quat_to_wxyz(bodies["quaternions"])
         motion.body_linear_velocities[:] = columns["/velocities/linear"]["vectors"]
         motion.body_angular_velocities[:] = columns["/velocities/angular"]["vectors"]
+
+        if motion.num_joints:
+            motion.joint_positions[:] = columns["/signals/joint"]["scalars"]
+            motion.joint_velocities[:] = columns["/signals/joint_velocity"]["scalars"]
         return motion
 
     def layer_paths(self, name):

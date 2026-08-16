@@ -58,6 +58,19 @@ def store(tmp_path):
     return written
 
 
+def test_motion_with_no_joints_round_trips(tmp_path):
+    """A mocap armature export has bodies but no joints at all."""
+    store = MotionStore(tmp_path / "motions")
+    motion = MotionSequence(num_frames=4, joint_names=[], body_names=BODY_NAMES, fps=50)
+    motion.body_positions[:] = np.arange(24, dtype=np.float32).reshape(4, 2, 3)
+    store.write_motion("mocap", motion)
+
+    back = store.read_motion("mocap")
+    assert back.joint_names == []
+    assert back.num_frames == 4
+    np.testing.assert_allclose(back.body_positions, motion.body_positions, rtol=0, atol=1e-6)
+
+
 def test_motion_round_trips_without_a_robot_model(tmp_path):
     """Direction 1 exports a Blender armature with no URDF; that must still be storable."""
     store = MotionStore(tmp_path / "motions")
