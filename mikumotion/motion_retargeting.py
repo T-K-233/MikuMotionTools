@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from loop_rate_limiters import RateLimiter
 import numpy as np
 import mink
@@ -11,6 +13,8 @@ from mikumotion.mujoco_utils import add_body_frames
 SOLVER = "daqp"
 DAMPING = 0.5
 MAX_ITER = 40
+KNEE_BIAS = 0.2    # rad, keeps knees off the straight-leg singularity
+ELBOW_BIAS = -0.2
 
 
 class MotionRetargetingIK:
@@ -58,125 +62,85 @@ class MotionRetargetingIK:
         robot_xml: The robot XML file used for IK solving.
         store: Where the source motion is read from and ``<name>_retargeted`` is written.
     """
-    def __init__(self, motion_name: str, robot_xml: str, store: MotionStore):
+    def __init__(self, motion_name: str, robot_xml: str, store: MotionStore, mapping: dict):
         self.motion_name = motion_name
-        self.robot_xml = robot_xml
         self.store = store
+        self.mapping = mapping
 
-        # load the source motion
         self.source_motion = store.read_motion(motion_name)
         self.num_frames = self.source_motion.num_frames
         self.fps = self.source_motion.fps
 
-        pose_targets = {
-            "pelvis": "pelvis",
-            "torso": "torso",
-            "head": "head",
-            "left_hand": "left_hand",
-            "right_hand": "right_hand",
-            "left_foot": "left_foot",
-            "right_foot": "right_foot",
-        }
+        # source body -> target robot link, in a stable order
+        self.retargeted_bodies = {source: target for source, (target, _) in mapping.items()}
 
-        pole_targets = {
-            "left_upper_arm": "left_shoulder_yaw",
-            "right_upper_arm": "right_shoulder_yaw",
-            "left_lower_arm": "left_elbow_pitch",
-            "right_lower_arm": "right_elbow_pitch",
-            "left_upper_leg": "left_hip_yaw",
-            "right_upper_leg": "right_hip_yaw",
-            "left_lower_leg": "left_knee_pitch",
-            "right_lower_leg": "right_knee_pitch",
-        }
-
-        self.retargeted_bodies = {}
-        for body_name, target_body_name in pose_targets.items():
-            self.retargeted_bodies[body_name] = target_body_name
-
-        for body_name, target_body_name in pole_targets.items():
-            self.retargeted_bodies[body_name] = target_body_name
-
-        # add coordinate frames to the robot XML
-        xml = open(self.robot_xml).read()
+        # draw where each body currently is and where it is being pulled to
+        xml = Path(robot_xml).read_text()
         xml = add_body_frames(xml, self.retargeted_bodies, prefix="current_", center_color=(0.0, 1.0, 1.0))
         xml = add_body_frames(xml, self.retargeted_bodies, prefix="target_", center_color=(1.0, 0.0, 1.0))
-        open(self.robot_xml.replace(".xml", "_frames.xml"), "w").write(xml)
+        framed_xml = Path(robot_xml).with_name(Path(robot_xml).stem + "_frames.xml")
+        framed_xml.write_text(xml)
 
-        model = mujoco.MjModel.from_xml_path(self.robot_xml.replace(".xml", "_frames.xml"))
+        model = self.floating_base_model(str(framed_xml))
         self.configuration = mink.Configuration(model)
+        self.model = self.configuration.model
+        self.data = self.configuration.data
 
-        # create a new motion sequence for the retargeted motion
+        # a floating base occupies the first 7 qpos entries; the rest are the joints we solve for
+        self.num_base_coords = 7
+        joint_names = [self.model.joint(j).name for j in range(self.model.njnt)
+                       if self.model.jnt_type[j] != mujoco.mjtJoint.mjJNT_FREE]
+
         self.target_motion = MotionSequence(
             num_frames=self.num_frames,
-            joint_names=[model.joint(1 + i).name for i in range(model.nu)],
+            joint_names=joint_names,
             body_names=list(self.retargeted_bodies.values()),
             fps=self.fps,
         )
 
         self.tasks = []
         self.frame_tasks = {}
-
-        for body_name, target_body_name in pose_targets.items():
-            print(f"Adding task for {body_name}")
+        for source, (target, orientation_cost) in mapping.items():
+            print(f"Adding task for {source} -> {target}")
             task = mink.FrameTask(
-                frame_name=target_body_name,
+                frame_name=target,
                 frame_type="body",
                 position_cost=1.0,
-                orientation_cost=0.5,
+                orientation_cost=orientation_cost,
                 lm_damping=1.0,
             )
-            self.frame_tasks[target_body_name] = task
+            self.frame_tasks[target] = task
             self.tasks.append(task)
 
-        for body_name, target_body_name in pole_targets.items():
-            print(f"Adding task for {body_name}")
-            task = mink.FrameTask(
-                frame_name=target_body_name,
-                frame_type="body",
-                position_cost=1.0,
-                orientation_cost=0.1,
-                lm_damping=1.0,
-            )
-            self.frame_tasks[target_body_name] = task
-            self.tasks.append(task)
+        # A low-priority regularizer biasing knees and elbows towards a slight bend, which
+        # keeps them off the singularity where a straight limb can gimbal-lock.
+        posture = self.data.qpos.copy()
+        for index, name in enumerate(joint_names):
+            posture[self.num_base_coords + index] = KNEE_BIAS if "knee" in name else (
+                ELBOW_BIAS if "elbow" in name else posture[self.num_base_coords + index])
+        posture_task = mink.PostureTask(self.model, cost=0.1)
+        posture_task.set_target(posture)
 
-        # add a posture task to keep the body in a reasonable posture
-        # this task acts like a low-priority regularizer, biasing the solution towards having a little bit bend on 
-        # elbow and knee joints, which is particularly helpful to avoid joint
-        # locking up by itself from gimbal lock problem
-        joint_positions = self.configuration.data.qpos.copy()
-        nfreejoint = 7
-        joint_positions[nfreejoint+3] = 0.2  # left knee
-        joint_positions[nfreejoint+10] = 0.2  # right knee
-        joint_positions[nfreejoint+20] = -0.2  # left elbow
-        joint_positions[nfreejoint+27] = -0.2  # right elbow
-        posture_task = mink.PostureTask(model, cost=0.1)
-        posture_task.set_target(joint_positions)
+        self.data.qpos = posture
+        mujoco.mj_forward(self.model, self.data)
+        self.limits = [mink.ConfigurationLimit(self.model)]
 
-        self.configuration.data.qpos = joint_positions
-        mujoco.mj_forward(model, self.configuration.data)
-
-        self.limits = [
-            mink.ConfigurationLimit(model),
-        ]
-
-        self.model = self.configuration.model
-        self.data = self.configuration.data
-
-        self.viewer = mujoco.viewer.launch_passive(
-            model=self.model,
-            data=self.data,
-            show_left_ui=False,
-            show_right_ui=False,
-        )
-        mujoco.mjv_defaultFreeCamera(self.model, self.viewer.cam)
-
-        # Initialize frame tasks to the home keyframe,
-        # but skip the posture task so its biased target is preserved.
         for task in self.tasks:
             task.set_target_from_configuration(self.configuration)
-
         self.tasks.append(posture_task)
+
+    def floating_base_model(self, xml_path: str):
+        """
+        Compile the robot with a floating base.
+
+        IK has to place the whole robot in the world, not just bend its joints, and a
+        description written for a fixed-base simulation (lite_pro) pins its root link.
+        """
+        spec = mujoco.MjSpec.from_file(xml_path)
+        root = spec.bodies[1]  # bodies[0] is the implicit world body
+        if not any(joint.type == mujoco.mjtJoint.mjJNT_FREE for joint in root.joints):
+            root.add_freejoint()
+        return spec.compile()
 
     def calculate_error(self) -> float:
         """
@@ -204,12 +168,19 @@ class MotionRetargetingIK:
         self.configuration.integrate_inplace(vel, dt)
         return self.calculate_error()
 
-    def run(self, realtime: bool = False):
+    def run(self, show_viewer: bool = False):
         """
-        Run the motion retargeting.
+        Solve every frame and write the result as ``<motion>_retargeted``.
+
+        With ``show_viewer`` a passive MuJoCo window follows the solve, throttled to
+        playback speed; without it the solve runs headless as fast as it can.
         """
-        if realtime:
-            self.rate = RateLimiter(frequency=self.fps / 4, warn=False)
+        viewer = mujoco.viewer.launch_passive(
+            model=self.model, data=self.data, show_left_ui=False, show_right_ui=False,
+        ) if show_viewer else None
+        if viewer is not None:
+            mujoco.mjv_defaultFreeCamera(self.model, viewer.cam)
+            rate = RateLimiter(frequency=self.fps / 4, warn=False)
 
         for frame_idx in tqdm(range(self.num_frames)):
             # update task targets
@@ -248,8 +219,8 @@ class MotionRetargetingIK:
             # forward kinematics to update body positions and orientations
             mujoco.mj_forward(self.model, self.data)
 
-            # store the joint motion data
-            self.target_motion.joint_positions[frame_idx, :] = self.data.qpos[7:]
+            # store the joint motion data, skipping the floating base's 7 coordinates
+            self.target_motion.joint_positions[frame_idx, :] = self.data.qpos[self.num_base_coords:]
 
             # extract body data from the MuJoCo robot after IK solving. target_motion's
             # body_names are retargeted_bodies' values, so iterating it keeps them aligned.
@@ -267,15 +238,15 @@ class MotionRetargetingIK:
                 self.target_motion.body_linear_velocities[frame_idx, i, :] = velocity[3:6]
                 self.target_motion.body_angular_velocities[frame_idx, i, :] = velocity[0:3]
 
-            # visualize at fixed FPS
-            self.viewer.sync()
-            if realtime:
-                self.rate.sleep()
+            if viewer is not None:
+                viewer.sync()
+                rate.sleep()
 
         # compute the velocities
         self.target_motion.joint_velocities[1:] = np.diff(self.target_motion.joint_positions, axis=0) * self.fps
 
-        self.viewer.close()
+        if viewer is not None:
+            viewer.close()
 
         retargeted_name = f"{self.motion_name}_retargeted"
         self.store.write_motion(retargeted_name, self.target_motion)

@@ -1324,6 +1324,37 @@ PRESETS = {
 
 
 # ============================================================
+# motion  ->  robot joints  (direction 1, the IK step)
+# ============================================================
+# ``{source_body: (target_body, orientation_cost)}`` for MotionRetargetingIK. The source
+# names are the mocap bodies of a MOCAP_EXPORTS rig; the targets are links of the robot
+# being solved for. A high orientation cost pins a limb's pose; a low one lets IK swing
+# the segment freely and only uses it to steer the elbow/knee (a pole target).
+
+ZAMUZA_TO_LITE_PRO = {
+    "pelvis": ("pelvis", 0.5),
+    "torso": ("chest", 0.5),
+    "head": ("head", 0.5),
+    "left_hand": ("left_hand", 0.5),
+    "right_hand": ("right_hand", 0.5),
+    "left_foot": ("left_foot", 0.5),
+    "right_foot": ("right_foot", 0.5),
+    "left_upper_arm": ("left_shoulder_yaw", 0.1),
+    "right_upper_arm": ("right_shoulder_yaw", 0.1),
+    "left_lower_arm": ("left_elbow_pitch", 0.1),
+    "right_lower_arm": ("right_elbow_pitch", 0.1),
+    "left_upper_leg": ("left_hip_yaw", 0.1),
+    "right_upper_leg": ("right_hip_yaw", 0.1),
+    "left_lower_leg": ("left_knee_pitch", 0.1),
+    "right_lower_leg": ("right_knee_pitch", 0.1),
+}
+
+RETARGET_MAPS = {
+    "ZAMUZA_TO_LITE_PRO": ZAMUZA_TO_LITE_PRO,
+}
+
+
+# ============================================================
 # Blender mocap armature  ->  motion  (direction 1: animation -> robot)
 # ============================================================
 # One entry per source rig for scripts/blender/export_mocap.py. Bones are listed in

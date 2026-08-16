@@ -67,9 +67,11 @@ def run_view(args):
 
 def run_retarget(args):
     from .motion_retargeting import MotionRetargetingIK
+    from .presets import RETARGET_MAPS
 
     store = MotionStore(args.root)
-    MotionRetargetingIK(args.name, args.mjcf, store).run(args.realtime)
+    mapping = RETARGET_MAPS[args.mapping]
+    MotionRetargetingIK(args.name, args.mjcf, store, mapping).run(args.view)
 
 
 def run_list(args):
@@ -99,7 +101,8 @@ def main():
     retarget = commands.add_parser("retarget", help="solve a robot's joints for a motion")
     retarget.add_argument("name")
     retarget.add_argument("mjcf", help="target robot MJCF")
-    retarget.add_argument("--realtime", action="store_true", help="throttle to playback speed")
+    retarget.add_argument("mapping", help="body map from mikumotion.presets.RETARGET_MAPS")
+    retarget.add_argument("--view", action="store_true", help="watch the solve in a MuJoCo window")
     retarget.set_defaults(handler=run_retarget)
 
     listing = commands.add_parser("list", help="show the motions in the store")
