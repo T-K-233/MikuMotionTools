@@ -80,7 +80,8 @@ def read_entity_columns(path):
     Read an ``.rrd`` into ``{entity_path: {component_name: numpy array}}``, frame-ordered.
 
     Rerun 0.36 has no dataframe API, so this streams chunks and stitches them back together.
-    Component values arrive one list per row; the leading element is the value itself.
+    Each row holds that frame's whole instance batch, so a body-pose column comes back
+    shaped ``(frames, bodies, 3)`` without any reshaping here.
     """
     store = rr.experimental.RrdReader(str(path)).store()
 
