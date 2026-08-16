@@ -1002,6 +1002,123 @@ def retarget_frame(
         bpy.context.view_layer.update()
 
 
+def bake_retarget(
+    source_obj: Object,
+    target_obj: Object,
+    bone_map: "dict[str, str]",
+    translation_root_target: str,
+    translation_root_source: str,
+    *,
+    frame_start: int,
+    frame_end: int,
+    ignore_twist: bool = False,
+    bone_axis_local: "Vector | None" = None,
+    use_rest_orientation_offsets: bool = True,
+    clear_existing: bool = True,
+    track_root_world_position: bool = False,
+) -> int:
+    """
+    Headless (non-modal) batch retarget: bake source->target animation onto the
+    target armature over ``[frame_start, frame_end]`` (inclusive), one keyframe per
+    frame. Same math as ``WM_OT_modal_retarget_motion`` but as a plain loop suitable
+    for ``blender --background``.
+
+    Args:
+        source_obj: Source armature (already animated/keyframed).
+        target_obj: Target armature to receive baked keyframes.
+        bone_map: ``{target_bone: source_bone}`` mapping (invalid pairs are skipped).
+        translation_root_target/source: bone pair whose world translation drives the
+            target root (only this target bone receives translation).
+        frame_start, frame_end: inclusive Blender frame range to bake.
+        ignore_twist: remove twist about ``bone_axis_local`` from transferred rotation.
+        use_rest_orientation_offsets: if True, transfer rotation in the *rest-relative*
+            (local-delta) sense ``R_tgt = R_tgt_rest·R_src_rest⁻¹·R_src_pose`` — only
+            correct when source and target bones share local axis conventions. If False,
+            transfer the source's *world* rotation delta ``R_tgt = (R_src_pose·R_src_rest⁻¹)·R_tgt_rest``
+            — the right choice when the two rigs have the SAME rest pose (e.g. both
+            T-pose) but unrelated local frames, as with a URDF robot -> VRM humanoid.
+        clear_existing: remove pre-existing F-curves for the mapped bones first.
+        track_root_world_position: override the translation-root bone so its world
+            *position* tracks the source root's world position directly (offset so the
+            two align at ``frame_start``), instead of the default rest-relative transfer.
+            Use this when source and target roots have different rest positions (e.g. a
+            URDF robot whose pelvis rest is at the origin vs. a VRM whose hips rest is at
+            standing height): the default transfer rotates the target's tall rest offset
+            by the root's rotation, which sinks/launches the root on large root rotations
+            (e.g. lying prone). Position-only tracking keeps the root where the source is.
+
+    Returns:
+        Number of frames baked.
+    """
+    assert source_obj.type == "ARMATURE" and target_obj.type == "ARMATURE", "both must be armatures"
+
+    bone_map = build_bone_map(source_obj, target_obj, bone_map, auto_map_same_names=False)
+    if not bone_map:
+        raise ValueError("no valid bone mappings (check source/target bone names)")
+    if translation_root_target not in bone_map:
+        raise ValueError(f"translation_root_target '{translation_root_target}' not in bone_map")
+    if source_obj.pose.bones.get(translation_root_source) is None:
+        raise ValueError(f"translation_root_source '{translation_root_source}' missing on source")
+
+    rest_rot_offsets = (
+        compute_rest_orientation_offsets(source_obj, target_obj, bone_map)
+        if use_rest_orientation_offsets else None
+    )
+
+    if clear_existing:
+        clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_root_target)
+
+    # for root position tracking: offset so the target root's world position equals the
+    # source root's world position, aligned to the target's rest position at frame_start.
+    root_pos_offset = None
+    if track_root_world_position:
+        C.scene.frame_set(frame_start)
+        bpy.context.view_layer.update()
+        src_pb0 = source_obj.pose.bones[translation_root_source]
+        src_w0 = (source_obj.matrix_world @ src_pb0.matrix).to_translation()
+        tgt_rest0 = get_rest_world_matrix(target_obj, translation_root_target).to_translation()
+        root_pos_offset = tgt_rest0 - src_w0
+
+    n = 0
+    for f in range(frame_start, frame_end + 1):
+        C.scene.frame_set(f)
+        bpy.context.view_layer.update()
+
+        retarget_frame(
+            source_obj=source_obj,
+            target_obj=target_obj,
+            bone_map=bone_map,
+            translation_root_target=translation_root_target,
+            translation_root_source=translation_root_source,
+            ignore_twist=ignore_twist,
+            bone_axis_local=bone_axis_local,
+            rest_rot_offsets=rest_rot_offsets,
+            use_rest_orientation_offsets=use_rest_orientation_offsets,
+        )
+
+        if root_pos_offset is not None:
+            # keep the baked root rotation, but set its world position to track the source
+            src_pb = source_obj.pose.bones[translation_root_source]
+            desired_world = (source_obj.matrix_world @ src_pb.matrix).to_translation() + root_pos_offset
+            tgt_pb = target_obj.pose.bones[translation_root_target]
+            m_world = target_obj.matrix_world @ tgt_pb.matrix
+            m_world.translation = desired_world
+            tgt_pb.matrix = target_obj.matrix_world.inverted() @ m_world
+            bpy.context.view_layer.update()
+
+        for tgt_name in bone_map.keys():
+            pb = target_obj.pose.bones[tgt_name]
+            pb.keyframe_insert(data_path="rotation_quaternion", frame=f)
+            pb.keyframe_insert(data_path="location", frame=f)
+
+        n += 1
+        if (f - frame_start) % 100 == 0:
+            print(f"[retarget] frame {f}/{frame_end}", end="\r")
+
+    print(f"\n[retarget] baked {n} frames onto '{target_obj.name}' ({len(bone_map)} mapped bones)")
+    return n
+
+
 # ============================================================
 # MODAL OPERATOR (responsive UI, ESC cancel)
 # ============================================================

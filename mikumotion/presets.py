@@ -1319,3 +1319,53 @@ PRESETS = {
     "MESHCAPADE_TO_G1_CFG": MESHCAPADE_TO_G1_CFG,
     "MIXAMO_TO_G1_CFG": MIXAMO_TO_G1_CFG,
 }
+
+
+# ============================================================
+# lite_pro robot  ->  VRM / VRoid humanoid
+# ============================================================
+# Bone map for the Blender source->target armature retargeter
+# (mikumotion.blender.RetargetConfig / bake_retarget): {target_vrm_bone: source_robot_link}.
+#
+# The robot models each articulation as a *chain* of 1-DOF links, so each VRM
+# ball bone is driven by the robot link that carries that segment's full
+# accumulated world orientation (the last link of the chain). E.g. the upper arm
+# takes the whole 3-DOF shoulder, so the VRM `Shoulder` bone is intentionally left
+# unmapped. Robot fingers have 4 joints (j1..j4); the VRM has 3 phalanges, so
+# j1/j2/j3 map to phalanx 1/2/3 and the extra tip (j4) is dropped.
+
+# (target, source) bone whose world *translation* drives the whole rig
+LITE_PRO_TO_VROID_TRANSLATION_ROOT = ("J_Bip_C_Hips", "pelvis")
+
+# vrm finger name -> robot finger index (finger1 is the thumb: offset toward +x,
+# nearest the wrist; finger3 the longest = middle; finger5 the shortest = little)
+_VROID_FINGERS = {"Thumb": 1, "Index": 2, "Middle": 3, "Ring": 4, "Little": 5}
+
+
+def _build_lite_pro_to_vroid_bone_map() -> "dict[str, str]":
+    m = {
+        # spine + head (torso chain: pelvis -> waist_yaw -> waist_roll -> chest)
+        "J_Bip_C_Hips": "pelvis",          # translation root
+        "J_Bip_C_Spine": "waist_yaw",
+        "J_Bip_C_Chest": "waist_roll",
+        "J_Bip_C_UpperChest": "chest",
+        "J_Bip_C_Neck": "neck_roll",
+        "J_Bip_C_Head": "head",
+    }
+    for v, r in (("L", "left"), ("R", "right")):
+        # arms (Shoulder omitted on purpose: UpperArm absorbs the full 3-DOF shoulder)
+        m[f"J_Bip_{v}_UpperArm"] = f"{r}_shoulder_yaw"
+        m[f"J_Bip_{v}_LowerArm"] = f"{r}_elbow_pitch"
+        m[f"J_Bip_{v}_Hand"] = f"{r}_hand"
+        # legs (hip chain -> hip_yaw thigh; ankle chain -> foot)
+        m[f"J_Bip_{v}_UpperLeg"] = f"{r}_hip_yaw"
+        m[f"J_Bip_{v}_LowerLeg"] = f"{r}_knee_pitch"
+        m[f"J_Bip_{v}_Foot"] = f"{r}_foot"
+        # fingers
+        for vf, rn in _VROID_FINGERS.items():
+            for k in (1, 2, 3):
+                m[f"J_Bip_{v}_{vf}{k}"] = f"{r}_finger{rn}_j{k}"
+    return m
+
+
+LITE_PRO_TO_VROID_BONE_MAP = _build_lite_pro_to_vroid_bone_map()

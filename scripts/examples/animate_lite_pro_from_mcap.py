@@ -55,9 +55,15 @@ def parse_args():
     return p.parse_args(argv)
 
 
-def _blender_has_ffmpeg(scene) -> bool:
-    prop = scene.render.image_settings.bl_rna.properties["file_format"]
-    return any(e.identifier == "FFMPEG" for e in prop.enum_items)
+def _try_enable_blender_ffmpeg(scene) -> bool:
+    """Try to select Blender's built-in FFmpeg muxer. Returns False on builds compiled
+    without FFmpeg (the RNA enum statically lists 'FFMPEG' even when it is not usable,
+    so we must actually attempt the assignment)."""
+    try:
+        scene.render.image_settings.file_format = "FFMPEG"
+        return True
+    except TypeError:
+        return False
 
 
 def _encode_png_seq(ffmpeg_bin, frames_dir, fps, out_video):
@@ -79,8 +85,7 @@ def render_video(scene, args, frame_start, n):
     scene.frame_start = frame_start
     scene.frame_end = frame_start + n - 1
 
-    if _blender_has_ffmpeg(scene):
-        scene.render.image_settings.file_format = "FFMPEG"
+    if _try_enable_blender_ffmpeg(scene):
         scene.render.ffmpeg.format = "MPEG4"
         scene.render.ffmpeg.codec = "H264"
         scene.render.ffmpeg.constant_rate_factor = "MEDIUM"
