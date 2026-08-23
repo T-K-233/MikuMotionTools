@@ -1,9 +1,9 @@
 """
 Direction 2, robot -> animation: replay a robot motion on a VRM/VRoid character.
 
-The robot's armature is built from its URDF and driven by the motion, then each VRM
-humanoid bone is baked from the robot link that carries that segment's world orientation
-(``presets.LITE_PRO_TO_VROID_BONE_MAP``).
+The script builds the robot's armature from its URDF and drives it with the motion. It then
+bakes each VRM humanoid bone from the robot link that carries that segment's world
+orientation (``presets.LITE_PRO_TO_VROID_BONE_MAP``).
 
     blender <character>.blend --background \
         --python scripts/blender/retarget_to_vrm.py -- <motion> <urdf> [--video out.mp4]

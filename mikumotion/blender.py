@@ -25,9 +25,7 @@ O = bpy.ops
 
 
 def set_scene_fps(fps: int) -> None:
-    """
-    Set the scene FPS.
-    """
+    """Set the frame rate of the current scene."""
     C.scene.render.fps = fps
     C.scene.render.fps_base = 1.0
 
@@ -45,16 +43,12 @@ def set_scene_animation_range(start: int, end: int) -> None:
 
 
 def set_armature_to_rest(armature: Object) -> None:
-    """
-    Set the armature to rest pose.
-    """
+    """Show the armature in its rest pose, ignoring any animation."""
     armature.data.pose_position = "REST"
 
 
 def set_armature_to_pose(armature: Object) -> None:
-    """
-    Set the armature to animation pose.
-    """
+    """Show the armature in its animated pose."""
     armature.data.pose_position = "POSE"
 
 
@@ -65,10 +59,10 @@ def armature_to_motion(
 ) -> MotionSequence:
     """
     **animation -> robot, step 1 of 2: into the hub.**
-    Reads a Blender armature's animation as a motion; the mirror of
-    ``forward_kinematics.robot_log_to_motion``, and the inverse of ``motion_to_armature``.
+    Reads a Blender armature's animation as a motion. It mirrors
+    ``forward_kinematics.robot_log_to_motion``, and inverts ``motion_to_armature``.
 
-    Reads body poses only. A rig has no joint angles; those come from the IK solve, which
+    It reads body poses only. A rig has no joint angles. Those come from the IK solve, which
     writes them to the robot's own layer.
 
     Args:
@@ -95,7 +89,6 @@ def armature_to_motion(
         bpy.context.scene.frame_set(start_frame + frame)
         bpy.context.view_layer.update()
 
-        # read bone positions
         for idx, bone_name in enumerate(motion.body_names):
 
             blender_bone_name = bone_name + blender_bone_postfix
@@ -151,9 +144,8 @@ def build_armature(tree: ArmatureTree, name="Armature", default_length=0.1):
         name: The name of the armature.
         default_length: The length given to leaf bones.
     """
-    # ensure we start in OBJECT mode; the scene's active object may currently be in
-    # EDIT or POSE mode (e.g. another armature), which makes object operators fail with
-    # "context is incorrect".
+    # Start in OBJECT mode. The scene's active object may be in EDIT or POSE mode, another
+    # armature for example, and an object operator then fails with "context is incorrect".
     if C.object is not None and C.object.mode != "OBJECT":
         O.object.mode_set(mode="OBJECT")
 
@@ -168,7 +160,6 @@ def build_armature(tree: ArmatureTree, name="Armature", default_length=0.1):
     armature = C.active_object
     armature.name = name
 
-    # switch to edit mode
     O.object.mode_set(mode="EDIT")
     edit_bones = armature.data.edit_bones
 
@@ -371,15 +362,15 @@ def robot_model_to_armature(robot: RobotModel, name: str, with_meshes: bool) -> 
     """
     Build a Blender armature (one bone per link) and the visual meshes for a parsed URDF robot.
 
-    The armature contains one bone per URDF link, with bone heads placed at the link
-    origins (see ``build_armature``). Each link's visual mesh is imported, placed at the
-    link frame (offset by the visual's own ``<origin>``), given a material from its color,
-    and parented to the corresponding bone so it follows the bone during animation.
+    The armature holds one bone per URDF link, with the bone heads at the link origins
+    (see ``build_armature``). Each link's visual mesh is then imported and placed at the
+    link frame, offset by the visual's own ``<origin>``. It takes a material from its color,
+    and parents to the matching bone, so it follows that bone during animation.
 
-    Note: the bone orientations point head->tail and do NOT match the URDF link frames.
-    Mesh placement therefore uses the independently-computed link world transforms
-    (``armature_tree_world_transforms``), and "Keep Transform" parenting keeps the mesh in
-    place regardless of bone orientation.
+    Note: the bone orientations point head to tail, and do not match the URDF link frames.
+    Mesh placement therefore uses the link world transforms that
+    ``armature_tree_world_transforms`` computes separately. "Keep Transform" parenting then
+    holds each mesh in place, whatever its bone's orientation.
 
     Args:
         robot: The parsed RobotModel (see ``mikumotion.urdf.RobotModel.from_file``).
@@ -450,19 +441,19 @@ def motion_to_armature(
 ) -> int:
     """
     **robot -> animation, step 2 of 2: out of the hub.**
-    Plays a motion on a Blender armature; the inverse of ``armature_to_motion``.
+    Plays a motion on a Blender armature. It inverts ``armature_to_motion``.
 
-    Drive a faithful (one-bone-per-link) armature from a MotionSequence of per-link
-    world poses, inserting a keyframe per frame and setting the scene's fps and range.
+    Drives a faithful armature, one bone per link, from a MotionSequence of per-link world
+    poses. It inserts one keyframe per frame, and sets the scene's fps and range.
 
-    Each link's Blender bone is posed so that its rigidly-parented visual mesh lands
-    exactly at that link's world pose from ``motion`` (``body_positions`` /
-    ``body_rotations``). This is *exact* — no ball-joint merging / approximation. The
-    pose is computed analytically as a per-bone ``matrix_basis`` from the world-space
-    deltas, so no per-bone ``view_layer.update()`` is needed (keeps long sequences fast).
+    Each link's Blender bone takes the pose that lands its rigidly-parented visual mesh on
+    that link's world pose from ``motion`` (``body_positions`` and ``body_rotations``). The
+    result is *exact*: it merges no ball joints and approximates nothing. Each pose is a
+    per-bone ``matrix_basis``, computed straight from the world-space deltas, so no bone
+    needs its own ``view_layer.update()``. That is what keeps a long sequence fast.
 
-    The armature must sit at the world origin (as built by ``robot_model_to_armature``)
-    and its bones must be named by link (matching ``motion.body_names`` / ``tree``).
+    The armature must sit at the world origin, as ``robot_model_to_armature`` builds it.
+    Its bones must be named by link, to match ``motion.body_names`` and ``tree``.
 
     Args:
         motion: Source MotionSequence (body frames == URDF link frames).
@@ -541,12 +532,24 @@ def motion_to_armature(
 # ============================================================
 
 def rot3_orthonormalized(m3: Matrix) -> Matrix:
+    """
+    Return a copy of ``m3`` with its axes renormalized.
+
+    A chain of matrix products drifts away from orthonormal, and Blender reads the drift as
+    scale or shear on the bone.
+    """
     r = m3.copy()
     r.normalize()
     return r
 
 
 def get_bone_depth(arm_obj, bone_name):
+    """
+    Return how many parents a bone has, counting up to the armature root.
+
+    ``retarget_frame`` poses bones in this order, so a parent is already posed when its
+    children read their own world matrices.
+    """
     bone = arm_obj.data.bones.get(bone_name)
     d = 0
     while bone and bone.parent:
@@ -556,6 +559,7 @@ def get_bone_depth(arm_obj, bone_name):
 
 
 def get_rest_world_matrix(arm_obj, bone_name) -> Matrix:
+    """Return a bone's rest matrix in world space, not in armature space."""
     return arm_obj.matrix_world @ arm_obj.data.bones[bone_name].matrix_local
 
 
@@ -572,16 +576,16 @@ def build_bone_map(source_obj, target_obj, bone_map) -> "dict[str, str]":
 
 def desired_pose_matrix(source_obj, target_obj, source_bone_name, target_bone_name) -> Matrix:
     """
-    The target bone's pose matrix, in target armature space, rotation only.
+    Return the target bone's pose matrix, in target armature space, rotation only.
 
-    The source bone's *world* rotation delta is applied to the target's rest orientation:
+    The source bone's *world* rotation delta carries onto the target's rest orientation:
 
         R_target = (R_source_pose . R_source_rest^-1) . R_target_rest
 
     Cancelling the source's own rest orientation is what makes this work between rigs that
-    share a rest pose but not their local bone axes — a URDF robot's link frames against a
-    VRM's head->tail bones. Mapping through the rest orientations instead
-    (R_target_rest . R_source_rest^-1 . R_source_pose) silently mangles such a pair.
+    share a rest pose but not their local bone axes, such as a URDF robot's link frames
+    against a VRM's head-to-tail bones. Mapping through the rest orientations instead,
+    as (R_target_rest . R_source_rest^-1 . R_source_pose), mangles such a pair in silence.
     """
     # how far the source bone has moved from its own rest pose, in world space
     source_pose = source_obj.matrix_world @ source_obj.pose.bones[source_bone_name].matrix
@@ -666,18 +670,18 @@ def retarget_armature(
 ) -> int:
     """
     **robot -> animation, rig to rig.**
-    Transfers an already-posed armature onto a differently-proportioned one (robot rig ->
-    character rig). The mirror of ``motion_retargeting.MotionRetargetingIK``, which goes the
-    other way by IK.
+    Transfers an already-posed armature onto a differently-proportioned one, a robot rig
+    onto a character rig. It mirrors ``motion_retargeting.MotionRetargetingIK``, which goes
+    the other way by IK.
 
-    Bake a source armature's motion onto a target armature, one keyframe per frame over
+    Bakes a source armature's motion onto a target armature, one keyframe per frame over
     ``[frame_start, frame_end]`` inclusive.
 
     Every bone takes the source's world rotation delta (see ``desired_pose_matrix``). The
-    root additionally has its world *position* set to follow the source root, offset so the
-    two line up at ``frame_start``. Deriving the root position from its rest pose instead
-    would rotate the target's rest hip offset by the root's rotation, which sinks the
-    character through the floor as soon as the root rotates far — lying prone, say.
+    root also takes a world *position* that follows the source root, offset so the two line
+    up at ``frame_start``. Deriving that position from the rest pose instead would turn the
+    target's rest hip offset by the root's rotation. The character then sinks through the
+    floor as soon as the root turns far, when it lies prone for example.
 
     Returns the number of frames baked.
     """

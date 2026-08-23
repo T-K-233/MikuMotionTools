@@ -1,20 +1,18 @@
 """
 Minimal URDF parser used to build Blender armatures and meshes.
 
-This module is intentionally dependency-light (only the standard library and
-numpy) so that it can be imported both from a normal Python environment and
-from inside Blender's bundled Python.
+This module depends on the standard library and numpy alone, so both a normal Python
+environment and Blender's bundled Python can import it.
 
-It parses the kinematic structure (links + joints) and the visual geometry
-(mesh files, their local placement, scale, and color) of a robot. The parsed
-``RobotModel`` can be converted into an :class:`~mikumotion.armature_tree.ArmatureTree`
-(link tree) via :meth:`RobotModel.to_armature_tree`, which the existing
-``blender.build_armature`` helper already knows how to consume.
+It parses a robot's kinematic structure (links and joints) and its visual geometry (mesh
+files, their local placement, scale, and color). :meth:`RobotModel.to_armature_tree` turns
+the parsed ``RobotModel`` into an :class:`~mikumotion.armature_tree.ArmatureTree`, the link
+tree that ``blender.build_armature`` consumes.
 
 URDF convention notes:
     - A joint's ``<origin>`` describes the child link frame relative to the
       parent link frame at zero joint position.
-    - ``rpy`` is a fixed-axis (extrinsic XYZ) rotation, i.e. the rotation matrix
+    - ``rpy`` is a fixed-axis (extrinsic XYZ) rotation, that is, the rotation matrix
       is ``R = Rz(yaw) @ Ry(pitch) @ Rx(roll)``. This matches
       ``mikumotion.math.euler_xyz_to_quat``.
     - A revolute joint rotates about ``<axis>``, expressed in the (child) joint
@@ -37,7 +35,7 @@ def _parse_vec(text: Optional[str], default: Tuple[float, ...]) -> np.ndarray:
 
 
 def _quat_mul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Hamilton product of two ``(w, x, y, z)`` quaternions."""
+    """Return the Hamilton product of two ``(w, x, y, z)`` quaternions."""
     aw, ax, ay, az = a
     bw, bx, by, bz = b
     return np.array([
@@ -52,9 +50,10 @@ def rpy_to_quat(rpy: np.ndarray) -> np.ndarray:
     """
     Convert a URDF ``rpy`` (roll, pitch, yaw) into a ``(w, x, y, z)`` quaternion.
 
-    URDF ``rpy`` is a fixed-axis rotation (roll about X, then pitch about Y, then
-    yaw about Z, all about the fixed parent axes), giving ``R = Rz(yaw) @ Ry(pitch) @ Rx(roll)``.
-    The equivalent quaternion is ``qz * qy * qx`` (Hamilton product).
+    URDF ``rpy`` is a fixed-axis rotation: roll about X, then pitch about Y, then yaw about
+    Z, every one of them about the fixed parent axes. That gives
+    ``R = Rz(yaw) @ Ry(pitch) @ Rx(roll)``, and the equivalent quaternion is the Hamilton
+    product ``qz * qy * qx``.
     """
     roll, pitch, yaw = (float(v) for v in rpy)
     qx = np.array([np.cos(roll / 2), np.sin(roll / 2), 0.0, 0.0])
@@ -151,7 +150,7 @@ class RobotModel:
         """
         Convert to an :class:`~mikumotion.armature_tree.ArmatureTree`.
 
-        Each link becomes a body; its local translation/rotation is taken from the
+        Each link becomes a body, and takes its local translation and rotation from the
         parent joint's ``<origin>`` (the root link gets identity).
         """
         from .armature_tree import ArmatureTree
@@ -290,7 +289,7 @@ def _resolve_mesh_path(
         package_name, _, relative = rest.partition("/")
         if mesh_package_roots and package_name in mesh_package_roots:
             return os.path.normpath(os.path.join(mesh_package_roots[package_name], relative))
-        # fall back: treat the package root as the URDF directory's parent
+        # no root given for this package, so treat the URDF directory's parent as the root
         return os.path.normpath(os.path.join(os.path.dirname(urdf_dir), package_name, relative))
 
     if filename.startswith("file://"):

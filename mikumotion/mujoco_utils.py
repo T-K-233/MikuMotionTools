@@ -3,7 +3,9 @@ import mujoco
 
 def create_empty_scene(show_world_frame: bool = False) -> str:
     """
-    Create an empty MuJoCo scene.
+    Return the XML for a bare MuJoCo scene: a checkered floor, a light and a skybox.
+
+    With ``show_world_frame``, the scene also carries a red/green/blue gizmo at the origin.
     """
     world_frame_xml = ""
 
@@ -50,7 +52,11 @@ def add_body_frames(
     center_color: tuple[float, float, float] = (1.0, 1.0, 1.0),
 ) -> str:
     """
-    Add coordinate frames to the base XML scene.
+    Add a red/green/blue gizmo for each named body to a scene, as a mocap body.
+
+    The frames are mocap bodies, so the caller can move them every step. This is how
+    MotionRetargetingIK shows two sets at once: where each link is now, and where the IK
+    is pulling it.
 
     Args:
         base_xml: Base XML string with empty worldbody
@@ -61,7 +67,6 @@ def add_body_frames(
     Returns:
         Complete XML string with frames added
     """
-    # Find the insertion point (before </worldbody>)
     insertion_point = base_xml.find("  </worldbody>")
     if insertion_point == -1:
         raise ValueError("Could not find </worldbody> tag in base XML")
@@ -70,7 +75,6 @@ def add_body_frames(
     axis_length = "0.05"
     center_size = "0.01"
 
-    # Generate frame XML for each frame
     frames_xml = ""
     for frame_name in body_names:
         print(f"Adding frame for {frame_name}")
@@ -92,6 +96,5 @@ def add_body_frames(
 """
         frames_xml += frame_xml
 
-    # Insert frames before </worldbody>
     complete_xml = base_xml[:insertion_point] + frames_xml + "\n" + base_xml[insertion_point:]
     return complete_xml

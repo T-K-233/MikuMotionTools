@@ -4,18 +4,18 @@
 
 Read a robot-motion log from an ``.mcap`` file into plain numpy arrays.
 
-The logs produced by the Lite-Pro tracking pipeline are **ROS2 (CDR-encoded)** MCAP
-files with two synchronized channels sampled at a fixed rate:
+The lite_pro tracking pipeline writes **ROS2 (CDR-encoded)** MCAP files. Each holds two
+channels, synchronized and sampled at a fixed rate:
 
 - ``/odom``          — ``nav_msgs/msg/Odometry``    : floating-base pose (+ twist) in ``world``.
 - ``/joint_states``  — ``sensor_msgs/msg/JointState``: per-joint angles (+ velocities).
 
-``read_robot_log`` decodes both channels, aligns them by timestamp, converts the
-base orientation from ROS ``xyzw`` to the ``wxyz`` convention used everywhere else in
-this codebase, and returns everything as dense numpy arrays. It is deliberately
-free of any ``mujoco``/``bpy`` dependency so it can run anywhere.
+``read_robot_log`` decodes both channels and aligns them by timestamp. It converts the base
+orientation from the ROS ``xyzw`` order to the ``wxyz`` order this codebase uses everywhere
+else, and returns dense numpy arrays. It imports neither ``mujoco`` nor ``bpy``, so it runs
+anywhere.
 
-Requires ``mcap`` and ``mcap-ros2-support`` (declared in ``pyproject.toml``).
+It needs ``mcap`` and ``mcap-ros2-support``, which ``pyproject.toml`` declares.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def read_robot_log(path: str, *, odom_topic: str = ODOM_TOPIC, joint_topic: str 
     for msg in read_ros2_messages(path):
         topic = msg.channel.topic
         ros = msg.ros_msg
-        t = int(msg.log_time_ns)  # raw log time in nanoseconds
+        t = int(msg.log_time_ns)
 
         if topic == odom_topic:
             p = ros.pose.pose.position
@@ -78,7 +78,7 @@ def read_robot_log(path: str, *, odom_topic: str = ODOM_TOPIC, joint_topic: str 
             ta = ros.twist.twist.angular
             odom[t] = {
                 "pos": (p.x, p.y, p.z),
-                "quat_wxyz": (q.w, q.x, q.y, q.z),  # -> w, x, y, z
+                "quat_wxyz": (q.w, q.x, q.y, q.z),
                 "lin": (tl.x, tl.y, tl.z),
                 "ang": (ta.x, ta.y, ta.z),
             }
@@ -130,12 +130,12 @@ def read_robot_log(path: str, *, odom_topic: str = ODOM_TOPIC, joint_topic: str 
         if j["velocity"] is not None:
             joint_velocities[i] = j["velocity"]
 
-    # normalize base quaternions defensively
+    # a logged quaternion is not guaranteed to be unit, and everything downstream assumes it is
     norms = np.linalg.norm(base_quaternions, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     base_quaternions /= norms
 
-    # infer fps from the median sample period
+    # the median ignores the gaps left by dropped messages, which a mean would fold in
     if n > 1:
         dt = float(np.median(np.diff(times)))
         fps = int(round(1.0 / dt)) if dt > 0 else 50

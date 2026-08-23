@@ -154,13 +154,13 @@ class MotionSequence:
         return (self.num_frames - 1) / self.fps
 
     def get_body_indices(self, body_names):
-        """Indices of the named bodies, in the order given."""
+        """Return the indices of the named bodies, in the order given."""
         for name in body_names:
             assert name in self.body_names, f"unknown body {name!r}, have {self.body_names}"
         return [self.body_names.index(name) for name in body_names]
 
     def copy(self):
-        """A deep copy, sharing no arrays with this sequence."""
+        """Return a deep copy, sharing no arrays with this sequence."""
         other = MotionSequence(self.num_frames, self.joint_names, self.body_names, self.fps)
         for field in ARRAY_FIELDS:
             getattr(other, field)[:] = getattr(self, field)
@@ -173,9 +173,9 @@ def fill_body_velocities(motion):
 
     Every producer calls this instead of differencing poses itself, because the angular
     part has two traps. It must come from the rotation between consecutive frames, because
-    Euler-angle rates are not an angular velocity. That rotation must also be taken the
-    short way round, because a quaternion can flip sign between frames and the flipped one
-    reads as a near-full turn, spiking at 2*pi*fps.
+    Euler-angle rates are not an angular velocity. That rotation must also go the short way
+    round. A quaternion can flip sign between frames, and the flipped one reads as a
+    near-full turn, which spikes at 2*pi*fps.
 
     Frame 0 keeps its zeros. There is no earlier pose to difference against.
     """
@@ -198,7 +198,7 @@ def rotate_motion(motion, z_rotation):
     """
     Return a copy of ``motion`` rotated about the world Z axis by ``z_rotation`` radians.
 
-    Joint angles are unaffected; everything expressed in world frame is rotated.
+    The rotation leaves the joint angles alone, and turns every world-frame field.
     """
     zero = np.zeros(1, dtype=np.float32)
     rotation = euler_zyx_to_quat(zero, zero, np.array([z_rotation], dtype=np.float32))[0]
@@ -241,18 +241,18 @@ def quat_to_wxyz(quat_xyzw):
 
 
 def body_poses_path(layer, body_name):
-    """Where a body's pose lives. The name is escaped: MMD bones are Japanese."""
+    """Return the entity path of a body's pose. The name is escaped: MMD bones are Japanese."""
     return f"/{layer}/body/poses/{rr.escape_entity_path_part(body_name)}"
 
 
 def body_frames_path(layer, body_name):
-    """Where the gizmo drawn on a body's frame lives."""
+    """Return the entity path of the gizmo drawn on a body's frame."""
     return f"/{layer}/body/frames/{rr.escape_entity_path_part(body_name)}"
 
 
 def body_frame(layer, body_name):
     """
-    A body's coordinate frame.
+    Return the name of a body's coordinate frame.
 
     The layer prefix keeps a reference body apart from a robot's link of the same name. It
     also keeps a robot's ``<robot>/body/<link>`` apart from ``<robot>/<link>``, the URDF link
@@ -263,7 +263,7 @@ def body_frame(layer, body_name):
 
 def axis_triad():
     """
-    A red/green/blue gizmo along +X/+Y/+Z, as one mesh of three thin boxes.
+    Return a red/green/blue gizmo along +X/+Y/+Z, as one mesh of three thin boxes.
 
     This is geometry rather than ``TransformAxes3D`` because only geometry can be bound to
     a coordinate frame. A 3D view that holds both frame-bound geometry and entity-transform
@@ -288,7 +288,7 @@ def axis_triad():
 
 def hidden_velocities(layer):
     """
-    Rules that hide one layer's velocity arrows.
+    Return the view rules that hide one layer's velocity arrows.
 
     The velocities are vectors without origins, so every arrow would fan out of the world
     origin. They stay in the recording, and you can switch them on in the viewer. Each entity
@@ -299,7 +299,7 @@ def hidden_velocities(layer):
 
 
 def reference_blueprint():
-    """Viewer layout for an exported motion: the body frames in 3D, timeline open."""
+    """Return the viewer layout for an exported motion: body frames in 3D, timeline open."""
     return rrb.Blueprint(
         rrb.Spatial3DView(origin="/", name="motion",
                           contents=["+ $origin/**"] + hidden_velocities(REFERENCE)),
@@ -309,8 +309,8 @@ def reference_blueprint():
 
 def robot_blueprint(robot):
     """
-    Viewer layout for a motion solved onto ``robot``: the robot in 3D beside its joint-angle
-    plots, with the reference gizmos drawn on top of it.
+    Return the viewer layout for a motion solved onto ``robot``: the robot in 3D beside its
+    joint-angle plots, with the reference gizmos drawn on top of it.
 
     Seeing both is the point. The reference frames are what the IK aims at, so the gap
     between them and the robot's links is the retarget's error, frame by frame.
@@ -333,7 +333,9 @@ def robot_blueprint(robot):
 
 def is_numeric_column(field):
     """
-    True for the float/int component columns; skips row ids, strings and frame names.
+    Return True for the float and int component columns, False for the rest.
+
+    Row ids, strings and the frame name column are the rest.
 
     Components nest their lists (a Transform3D translation arrives as
     ``list<fixed_size_list<float>[3]>``), so unwrap until the leaf type.
@@ -380,7 +382,7 @@ def read_entity_columns(path):
 
 def read_entity_components(path):
     """
-    Every entity in an ``.rrd`` and the components on it, static entities included.
+    Return every entity in an ``.rrd`` and the components on it, static entities included.
 
     ``read_entity_columns`` sees only what is on the timeline, so geometry, gizmos and the
     URDF's static transforms are invisible to it.
@@ -464,7 +466,7 @@ class MotionStore:
         return self.root / "blueprints" / f"{robot}.rbl"
 
     def robots(self, name):
-        """Which robots this motion has been solved for, from the layers on disk."""
+        """Return the robots this motion has been solved for, read from the layers on disk."""
         layers = (path for path in self.root.iterdir() if path.is_dir())
         return sorted(layer.name for layer in layers
                       if layer.name not in (REFERENCE, "blueprints")
@@ -611,7 +613,7 @@ class MotionStore:
 
     def layer_paths(self, name):
         """
-        Every file that makes up ``name``, for handing to the Rerun viewer.
+        Return every file that makes up ``name``, for handing to the Rerun viewer.
 
         The layers share a recording id, so opening them together is all the composition
         Rerun needs. A motion with no robot layer is still viewable, as body gizmos.

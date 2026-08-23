@@ -35,10 +35,9 @@ import numpy as np
 
 class ArmatureTree:
     """
-    An armature tree gives a complete description of a rigid skeleton. It describes a tree structure
-    over a list of nodes with their names indicated by strings. Each edge in the tree has a local
-    translation associated with it which describes the distance between the two nodes that it
-    connects.
+    A complete description of a rigid skeleton, as a tree over named nodes. Each node is one
+    body. Each edge carries a local translation, which is the distance between the two nodes
+    that the edge connects.
 
     Derived from NVIDIA CALM poselib:
     https://github.com/NVlabs/CALM/blob/main/calm/poselib/poselib/skeleton/skeleton3d.py
@@ -52,6 +51,8 @@ class ArmatureTree:
         local_rotations: np.ndarray,
     ):
         """
+        Build the tree from one array per property, all in body order.
+
         Args:
             body_names: a list of length NUM_BODIES, containing the names for each body.
             body_parent_indices: an int32-typed numpy array of length NUM_BODIES that represents the edge to its parent.
@@ -71,7 +72,7 @@ class ArmatureTree:
         self._local_rotations = local_rotations.astype(np.float32)
 
     def __len__(self) -> int:
-        """ Number of bodies in the armature tree. """
+        """Number of bodies in the armature tree."""
         return len(self.body_names)
 
     def __getitem__(self, item: int) -> str:
@@ -96,27 +97,27 @@ class ArmatureTree:
 
     @property
     def num_bodies(self) -> int:
-        """ Number of bodies in the armature tree. """
+        """Number of bodies in the armature tree."""
         return len(self)
 
     @property
     def body_names(self) -> List[str]:
-        """ List of body names. """
+        """List of body names."""
         return self._body_names
 
     @property
     def body_parent_indices(self) -> np.ndarray:
-        """ Array of body parent indices. """
+        """Array of body parent indices."""
         return self._body_parent_indices
 
     @property
     def local_translations(self) -> np.ndarray:
-        """ Array of local translations in meters. """
+        """Array of local translations in meters."""
         return self._local_translations
 
     @property
     def local_rotations(self) -> np.ndarray:
-        """ Array of local rotations in quaternion. """
+        """Array of local rotations, as quaternions."""
         return self._local_rotations
 
     def get_index(self, body_name: str) -> int:
@@ -213,7 +214,7 @@ class ArmatureTree:
         """
         Parses a URDF file and returns an Armature Tree describing its link structure.
 
-        Each link becomes a body; its local translation and rotation are taken from
+        Each link becomes a body, and takes its local translation and rotation from
         the parent joint's ``<origin>``. The root link (the one that is never a joint
         child) becomes the tree root.
 

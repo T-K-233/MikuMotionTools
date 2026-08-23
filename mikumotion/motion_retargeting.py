@@ -22,12 +22,12 @@ BASE_COORDS = 7    # a floating base occupies the first 7 qpos entries
 class MotionRetargetingIK:
     """
     **animation -> robot, step 2 of 2: hub to hub.**
-    Solves a robot's joints for a character motion, by IK. The mirror of
+    Solves a robot's joints for a character motion, by IK. It mirrors
     :func:`mikumotion.blender.retarget_armature`, which retargets the other way.
 
     ``mapping`` pairs a source body with a robot link and an orientation cost, as
-    ``{"left_hand": ("left_hand", 0.5)}``. Position is always tracked at cost 1.0. A high
-    orientation cost pins a limb's pose; a low one lets the IK swing the segment freely and
+    ``{"left_hand": ("left_hand", 0.5)}``. The IK always tracks position at cost 1.0. A high
+    orientation cost pins a limb's pose. A low one lets the IK swing the segment freely, and
     uses it only to steer the elbow or knee.
 
     Args:
@@ -107,13 +107,14 @@ class MotionRetargetingIK:
 
     def rest_offsets(self) -> dict:
         """
-        One constant rotation per mapped pair, from the source body's frame to its link's.
+        Return one constant rotation per mapped pair, from the source body's frame to the
+        link's.
 
         A mocap bone and the link it drives disagree about which way their axes point. The
-        zamuza foot and the lite_pro foot sit 90 degrees apart with both rigs at rest, so
-        aiming the IK at the source's absolute orientation twists the robot by that much.
-        The offset makes the target the source's rotation relative to its own rest pose,
-        applied to the robot's zero pose.
+        zamuza foot and the lite_pro foot sit 90 degrees apart with both rigs at rest.
+        Aiming the IK at the source's absolute orientation therefore twists the robot by
+        that much. The offset makes the target the source's rotation relative to its own
+        rest pose, applied to the robot's zero pose.
         """
         reference = f"{self.motion_name}_reset"
         assert self.store.reference_file(reference).exists(), (
@@ -147,7 +148,7 @@ class MotionRetargetingIK:
         return spec.compile()
 
     def calculate_error(self) -> float:
-        """The combined error of every task."""
+        """Return the combined error of every task."""
         return np.linalg.norm(
                 np.concatenate(
                     [task.compute_error(self.configuration) for task in self.tasks]
@@ -172,8 +173,8 @@ class MotionRetargetingIK:
         """
         Solve every frame and write the result as ``<robot>/<motion>``.
 
-        With ``show_viewer`` a passive MuJoCo window follows the solve, throttled to
-        playback speed; without it the solve runs headless as fast as it can.
+        With ``show_viewer``, a passive MuJoCo window follows the solve at playback speed.
+        Without it, the solve runs headless as fast as it can.
         """
         viewer = mujoco.viewer.launch_passive(
             model=self.model, data=self.data, show_left_ui=False, show_right_ui=False,

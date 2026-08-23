@@ -5,11 +5,11 @@ import numpy as np
 
 
 def euler_xyz_to_quat(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> np.ndarray:
-    """Convert rotations given as Euler angles in radians to Quaternions.
+    """Convert Euler angles in radians to quaternions.
 
     Note:
-        The euler angles are assumed in XYZ convention (1-2-3 sequence).
-        See https://ntrs.nasa.gov/citations/19770024290 for different conventions.
+        This function assumes the XYZ convention (1-2-3 sequence).
+        See https://ntrs.nasa.gov/citations/19770024290 for other conventions.
 
     Args:
         roll: Rotation around x-axis (in radians). Shape is (N,).
@@ -35,11 +35,11 @@ def euler_xyz_to_quat(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> n
 
 
 def euler_zyx_to_quat(roll: np.ndarray, pitch: np.ndarray, yaw: np.ndarray) -> np.ndarray:
-    """Convert rotations given as Euler angles in radians to Quaternions.
+    """Convert Euler angles in radians to quaternions.
 
     Note:
-        The euler angles are assumed in ZYX convention (3-2-1 sequence).
-        See https://ntrs.nasa.gov/citations/19770024290 for different conventions.
+        This function assumes the ZYX convention (3-2-1 sequence).
+        See https://ntrs.nasa.gov/citations/19770024290 for other conventions.
 
     Args:
         roll: Rotation around x-axis (in radians). Shape is (N,).
@@ -75,19 +75,17 @@ def quat_mul(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
         The product of the two quaternions in (w, x, y, z). Shape is (..., 4).
 
     Note:
-        Supports NumPy broadcasting. If shapes don't match, broadcasting will be applied.
+        If the shapes do not match, NumPy broadcasts them.
     """
-    # Apply broadcasting to match shapes
     q1_broadcasted, q2_broadcasted = np.broadcast_arrays(q1, q2)
 
-    # reshape to (N, 4) for multiplication
+    # flatten to (N, 4), so the component algebra below indexes one axis
     shape = q1_broadcasted.shape
     q1 = q1_broadcasted.reshape(-1, 4)
     q2 = q2_broadcasted.reshape(-1, 4)
-    # extract components from quaternions
     w1, x1, y1, z1 = q1[:, 0], q1[:, 1], q1[:, 2], q1[:, 3]
     w2, x2, y2, z2 = q2[:, 0], q2[:, 1], q2[:, 2], q2[:, 3]
-    # perform multiplication
+    # Hamilton product, in the factored form that trades multiplies for adds
     ww = (z1 + x1) * (x2 + y2)
     yy = (w1 - y1) * (w2 + z2)
     zz = (w1 + y1) * (w2 - z2)

@@ -2,9 +2,9 @@
 Scene dressing and rendering for the Blender-side scripts: ground, light, a camera that
 follows the motion, and a video render.
 
-Blender is often built without FFmpeg (the bundled build here is), and its RNA enum lists
-``FFMPEG`` regardless, so there is no reliable flag to test. This module therefore always
-renders a PNG sequence and hands it to an external encoder.
+Blender is often built without FFmpeg, and the build bundled here is one of those. Its RNA
+enum still lists ``FFMPEG``, so no flag tells you whether the encoder is there. This module
+therefore always renders a PNG sequence and hands it to an external encoder.
 """
 
 import os
@@ -19,7 +19,7 @@ CAMERA_LOOK_HEIGHT = 0.5  # aim low enough that crouching and prone poses stay f
 
 
 def add_ground():
-    """A large matte plane at z = 0, so contact with the floor is readable."""
+    """Add a large matte plane at z = 0, which makes contact with the floor readable."""
     bpy.ops.mesh.primitive_plane_add(size=40.0, location=(0, 0, 0))
     ground = bpy.context.active_object
     ground.name = "Ground"
@@ -32,7 +32,7 @@ def add_ground():
 
 
 def add_lighting():
-    """A single sun plus a dark world background."""
+    """Add a single sun, and darken the world background."""
     bpy.ops.object.light_add(type="SUN", location=(4, -4, 8))
     sun = bpy.context.active_object
     sun.data.energy = 3.0
@@ -46,7 +46,7 @@ def add_lighting():
 
 
 def follow_camera(motion, frame_start):
-    """A camera keyframed to track the root body's position across the motion."""
+    """Add a camera, keyframed to track the root body's position across the motion."""
     root = motion.body_positions[:, 0]
 
     target = bpy.data.objects.new("LookAt", None)
@@ -75,7 +75,11 @@ def follow_camera(motion, frame_start):
 
 
 def configure_render(shading):
-    """Workbench at a fixed resolution; ``shading`` is MATERIAL for robots, TEXTURE for characters."""
+    """
+    Set up the Workbench renderer at a fixed resolution.
+
+    Pass MATERIAL for ``shading`` to render a robot, or TEXTURE to render a character.
+    """
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.display.shading.color_type = shading

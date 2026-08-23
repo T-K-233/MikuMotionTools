@@ -1,6 +1,6 @@
 """
 **robot -> animation, step 1 of 2: into the hub.**
-Converts a robot log into a motion; the mirror of
+Converts a robot log into a motion. It mirrors
 :func:`mikumotion.blender.armature_to_motion`, which does the same job for direction 1.
 
 A log carries joint angles and a floating-base pose. MuJoCo forward kinematics turns
@@ -30,7 +30,7 @@ from .motion_sequence import MotionSequence, fill_body_velocities
 
 
 def pose_matrix(position: np.ndarray, quat_wxyz: np.ndarray) -> np.ndarray:
-    """A 4x4 homogeneous transform from a position and a (w, x, y, z) quaternion."""
+    """Return a 4x4 homogeneous transform from a position and a (w, x, y, z) quaternion."""
     rotation = np.zeros(9, dtype=np.float64)
     mujoco.mju_quat2Mat(rotation, np.asarray(quat_wxyz, dtype=np.float64))
 
@@ -41,7 +41,7 @@ def pose_matrix(position: np.ndarray, quat_wxyz: np.ndarray) -> np.ndarray:
 
 
 def matrix_to_quat(rotation: np.ndarray) -> np.ndarray:
-    """A (w, x, y, z) quaternion from a 3x3 rotation matrix."""
+    """Return a (w, x, y, z) quaternion from a 3x3 rotation matrix."""
     quat = np.zeros(4, dtype=np.float64)
     mujoco.mju_mat2Quat(quat, np.ascontiguousarray(rotation, dtype=np.float64).reshape(9))
     return quat
@@ -58,7 +58,7 @@ def robot_log_to_motion(
         mcap_path: Path to the ROS2 motion ``.mcap`` (see :func:`read_robot_log`).
         mjcf_path: Path to the robot MJCF used for forward kinematics.
         base_body: Name of the body whose world pose the ``/odom`` topic reports
-            (the floating base; ``pelvis`` for lite_pro).
+            (the floating base, which is ``pelvis`` for lite_pro).
 
     Returns:
         A ``MotionSequence`` whose ``body_names`` are the MJCF body names (excluding

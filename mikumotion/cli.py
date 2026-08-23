@@ -6,8 +6,8 @@ The ``mikumotion`` command line: one entry point for working with motion files.
     mikumotion retarget <name> <mjcf> <urdf> <map>    solve a robot's joints for a motion
     mikumotion list                                   show the motions in the store
 
-Motions are addressed by name, not by path: the layout under ``--root`` (see
-:mod:`mikumotion.motion_sequence`) decides which stage lands in which layer.
+You address a motion by name, not by path. The layout under ``--root`` decides which stage
+lands in which layer (see :mod:`mikumotion.motion_sequence`).
 """
 
 import argparse
@@ -19,7 +19,12 @@ from .motion_sequence import REFERENCE, MotionStore
 
 
 def run_import(args):
-    """A logged motion is both stages at once: the poses are the export, the joints the solve."""
+    """A logged motion is both stages at once: the poses are the export, the joints the solve.
+
+    This command solves nothing, because the log already carries the joint angles a robot
+    reached. Forward kinematics turns those angles into the poses, and both layers come from
+    the one sequence.
+    """
     from .forward_kinematics import robot_log_to_motion
 
     store = MotionStore(args.root)
