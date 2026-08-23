@@ -207,3 +207,9 @@ blender-projects/
 
 # Robot description files
 data/robots/
+
+# Motion data and render outputs (large, regenerable from the pipeline)
+*.rrd
+*.rbl
+*.mp4
+renders/

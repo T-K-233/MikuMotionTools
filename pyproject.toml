@@ -1,6 +1,6 @@
 [project]
 name = "mikumotion"
-version = "2025.07.25"
+version = "2026.02.22"
 readme = "README.md"
 authors = [
     {name = "-T.K.-", email = "tk233.xyz@gmail.com"},
@@ -10,6 +10,10 @@ dependencies = [
     "numpy",
     "mujoco",
     "mink",
+    "tqdm>=4.67.3",
+    "mcap>=1.4.0",
+    "mcap-ros2-support>=0.5.0",
+    "rerun-sdk>=0.36.0",
 ]
 keywords = ["motion", "mmd", "blender"]
 classifiers = [
@@ -25,9 +29,16 @@ examples = [
     "osqp >=0.6.2,<1",
     "matplotlib",
 ]
+dev = [
+    "pytest",
+]
 all = [
     "mikumotion[examples]",
+    "mikumotion[dev]",
 ]
+
+[project.scripts]
+mikumotion = "mikumotion.cli:main"
 
 [project.urls]
 Source = "https://github.com/T-K-233/MikuMotionTools"

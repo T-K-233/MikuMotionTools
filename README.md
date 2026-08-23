@@ -1,143 +1,153 @@
 # MikuMotionTools
 
-MikuMotionTools contains various functions for converting MMD (MikuMikuDance) motions and other motion file formats into armature motion format that can be used in the Isaac Lab RL training environment.
+MikuMotionTools converts motion data for humanoid robot reinforcement learning (RL). It sits between
+*animation-world* motion (MMD/MikuMikuDance dances, mocap, Blender rigs) and *robotics-world* motion
+(a robot's joint angles and link poses), and translates in both directions:
+
+- **animation → robot** — make reference motions for RL training from Blender armature animation.
+- **robot → animation** — show what a trained policy did, as a character animation.
+
+One data structure holds everything: a [Rerun](https://rerun.io) `.rrd` motion file. Every other
+module converts into or out of that format.
 
 
-## Getting Started
-
-First, clone the repository from Github
+## Install
 
 ```bash
 git clone https://github.com/T-K-233/MikuMotionTools.git
 cd ./MikuMotionTools/
 uv pip install -e .
-```
-
-and install the dependencies
-
-```bash
 uv sync
-```
-
-To install extra dependencies that is required by the example code, do
-
-```bash
 uv sync --extra examples
 ```
 
+The last line is only needed for the example code.
 
-## General Workflow
-
-The general workflow of retargeting is listed as follows:
-
-1. Create a Blender project and import the source motion. Adjust the animation in Blender to match the target policy frequency (typically 50 Hz).
-
-2. Create a Python script to read the key frame position and orientations of the source armature motion in the Blender project. This will generate a MotionSequence labeled with source motion bone names.
-
-3. Create a keypoint mapping configuration between the source motion armature and target motion armature. Some examples are in [presets.py](./mikumotion/presets.py).
-
-4. Use [run_retargeting.py](./scripts/run_retargeting.py) to perform motion retargeting. This will first read from the source MotionSeuqence, perform the remapping translation, rotation, and scaling according to the mapping config, perform IK solving and get the joint positions, update the body pose and velocities according to the solved FK solutions, and write the result as a new MotionSequence file.
-
-
-## Running examples
-
-Export motion from Blender.
-
-This script only exports the body pose data. The joint data will be empty, and need to be filled in with the following retargeting script.
+Blender runs the Blender-side scripts with its own Python, which needs `rerun-sdk`:
 
 ```bash
-blender ./blender-projects/Zamuza.blend --python ./scripts/examples/export_zamuza.py
+<blender>/python/bin/python.exe -m pip install rerun-sdk
 ```
 
-View motion with matplotlib:
+
+## Commands
+
+You address a motion by **name**, not by path. The store layout decides where each stage lands.
 
 ```bash
-uv run ./scripts/view_motion.py --motion ./data/motions/zamuza_0_1632.npz
+mikumotion import <log.mcap> <robot.xml> <robot.urdf>        # robot log -> reference/ + <robot>/
+mikumotion view <name>                                       # watch every layer in Rerun
+mikumotion retarget <name> <robot.xml> <robot.urdf> <map>    # reference/ -> <robot>/
+mikumotion list                                              # motions, and the robots each is solved for
 ```
-
-Run retargeting logic to solve for joint data.
 
 ```bash
-uv run ./scripts/run_retargeting.py --motion ./data/motions/zamuza_0_1632.npz --mapping MMD_YYB_TO_G1_CFG --real-time
+# animation -> robot: export a mocap armature as a motion
+blender ./blender-projects/zamuza.blend --python ./scripts/blender/export_mocap.py -- zamuza
+
+# robot -> animation: play a motion on the robot's own rig
+blender --background --python ./scripts/blender/animate_robot.py -- lite_pro_tracking <robot.urdf>
+
+# robot -> animation: replay it on a VRM character
+blender ./character.blend --background --python ./scripts/blender/retarget_to_vrm.py -- lite_pro_tracking <robot.urdf>
 ```
 
-When adding new mapping config, the following script might be helpful:
+
+## The two pipelines
+
+Conversions are named **`a_to_b`**, so inverses pair up on sight: `armature_to_motion` against
+`motion_to_armature`. Use `from_` only for constructors, as in `RobotModel.from_file(path)`, and
+`to_` for methods that convert what they belong to, as in `robot.to_armature_tree()`.
+
+| Step | animation → robot | robot → animation |
+|---|---|---|
+| 1. read the source | *(Blender opens the .blend)* | `mcap_io.read_robot_log` |
+| 2. **into the hub** | `blender.armature_to_motion` | `forward_kinematics.robot_log_to_motion` |
+| 3. store the export | `MotionStore.write_reference_motion` → `reference/` | `MotionStore.write_reference_motion` → `reference/` |
+| 4. retarget | `MotionRetargetingIK` solves the robot's joints | `blender.retarget_armature` bakes the robot rig onto a character rig |
+| 5. store the solve | `MotionStore.write_robot_motion` → `<robot>/` | *(read it back with `read_reference_motion`)* |
+| 6. **out of the hub** | *(the robot's joints are the product)* | `blender.motion_to_armature` |
+| entry point | `scripts/blender/export_mocap.py` | `scripts/blender/animate_robot.py`, `retarget_to_vrm.py` |
+
+Step 4 is where the two directions differ. A robot needs inverse kinematics (IK), because a
+character's limb proportions do not map onto a robot's joints. A character needs only a rotation
+transfer.
+
+
+## Workflow
+
+1. Create a Blender project and import the source motion. Set the animation to the target policy
+   frequency, usually 50 Hz.
+
+2. Export the armature with `export_mocap.py`. It writes `<preset>`, the motion itself, and
+   `<preset>_reset`, the rig's rest pose. The retarget needs the rest pose to measure how far each
+   bone's frame sits from the link that the bone drives.
+
+3. Write a keypoint mapping between the source armature and the target robot. See
+   [presets.py](./mikumotion/presets.py) for examples.
+
+4. Run `mikumotion retarget` to solve the robot's joints by IK. The result lands beside the export,
+   as `<robot>/<motion>.rrd`.
+
+Match the frame rate to the policy update rate of the training environment. A mismatch forces
+expensive interpolation.
+
+
+## Motion format
+
+A motion is a Rerun `.rrd` recording, stored as one directory per pipeline stage and one file per
+motion, following the [Rerun dataset convention](https://huggingface.co/datasets/rerun/arkitscenes-rrd):
+
+```
+data/motions/
+  reference/  <motion>.rrd  body poses as exported, robot-agnostic
+  <robot>/    <motion>.rrd  that robot's joints, and the poses its solve reached
+  blueprints/ <robot>.rbl   viewer layout for that robot
+```
+
+Read a motion with `MotionStore(root).read_reference_motion(name)`, or
+`read_reference_motion(name, robot)` to carry that robot's solved joints on the same sequence.
+
+[`motion_sequence.py`](./mikumotion/motion_sequence.py) documents the rest: the field shapes and
+units, the entity paths, and the frame rules that a producer must follow.
+
+
+## Viewing
+
+`mikumotion view` only resolves paths and hands the layer files to the `rerun` binary. Any machine
+with `rerun` and a copy of the files can do the same, with no Python:
 
 ```bash
-# export the reset pose of target robot
-blender ./blender-projects/G1-USD.blend --python ./scripts/examples/export_g1_reset_pose.py
-
-# compare the frames between source motion and target robot armature
-uv run ./scripts/compare_frames.py --source ./data/motions/actorcore_reset.npz --target ./data/motions/g1_reset_pose.npz --mapping ACTORCORE_TO_G1_CFG
+rerun data/motions/*/zamuza.rrd data/motions/blueprints/lite_pro.rbl
 ```
 
-
-## Directory Structure
-
-`blender-projects/` stores the blender project files. 
-
-`mikumotion/` stores the Python source file of the library.
-
-`data/motions/` stores the converted motions.
-
-`data/robots/` stores the robot asset file used during inverse kinematic solving.
-
-Note: Due to licensing restrictions, the Blender project files and MMD motions cannot be redistributed here. To access them, please obtain the files directly from their original creators. For your convenience, we’ve included links to the original authors’ MMD motions in [this note](./data/motions/MMD-Motion-Sources.md). For internal developers, the mirror of this directory is stored at [Google Drive](https://drive.google.com/drive/folders/1sFQmo_UvkY5xSIZKLjXLxlAOpLdI_1jz?usp=drive_link).
+The layers share an `application_id` and a `recording_id`, and [the viewer pools data by those two
+ids](https://rerun.io/docs/concepts/apps-and-recordings), so several files open as one recording.
+Each layer also embeds its own blueprint, so any one file opens sensibly alone. Blueprints do not
+merge and the last one loaded wins, so pass `blueprints/<robot>.rbl` last.
 
 
-## Motion Format
-
-This library uses the motion file format defined in IsaacLab [MotionLoader](https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab_tasks/isaaclab_tasks/direct/humanoid_amp/motions/motion_loader.py#L12).
-
-Each motion file is a numpy dictionary with the following fields. Here, we assume the robot has `D` number of joints and `B` number of linkages, and the motion file has `F` frames.
-
-- `fps`: an int64 number representing the frame rate of the motion data.
-- `dof_names`: a list of length `D` containing the names of each joint.
-- `body_names`: a list of length `B` containing the names of each link.
-- `dof_positions`: a numpy array of shape `(F, D)` containing the rotational positions of the joints in `rad`.
-- `dof_velocities`: a numpy array of shape `(F, D)` containing the rotational (angular) velocities of the joints in `rad/s`.
-- `body_positions`: a numpy array of shape `(F, B, 3)` containing the locations of each body in **world frame**, in `m`.
-- `body_rotations`: a numpy array of shape `(F, B, 4)` containing the rotations of each body in **world frame**, in quaternion `(qw, qx, qy, qz)`.
-- `body_linear_velocities`: a numpy array of shape `(F, B, 3)` containing the linear velocities of each body in **world frame**, in `m/s`.
-- `body_angular_velocities`: a numpy array of shape `(F, B, 3)` containing the rotational (angular) velocities of each body in **world frame**, in `rad/s`.
-
-The converted motion file is targeted for one particular robot skeleton structure. 
-
-To ensure best performance, also make sure that the frame rate matches the training environment policy update rate to avoid expensive interpolations.
-
-
-### Generic Joint Names
-
-We follow the [SMPL-X joint name](https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18) as a generic joint naming convention.
+## Directories
 
 ```
-    "pelvis",
-    "left_hip",
-    "right_hip",
-    "spine1",
-    "left_knee",
-    "right_knee",
-    "spine2",
-    "left_ankle",
-    "right_ankle",
-    "spine3",
-    "left_foot",
-    "right_foot",
-    "neck",
-    "left_collar",
-    "right_collar",
-    "head",
-    "left_shoulder",
-    "right_shoulder",
-    "left_elbow",
-    "right_elbow",
-    "left_wrist",
-    "right_wrist",
-    "left_hand",
-    "right_hand",
+blender-projects/  Blender project files
+mikumotion/        the library
+scripts/blender/   the scripts Blender runs
+data/motions/      converted motions
+data/robots/       robot assets for the IK solve
 ```
 
+The license does not permit redistribution of the Blender project files or the MMD motions. Get them
+from their original creators; [this note](./data/motions/MMD-Motion-Sources.md) links to the
+original authors. Internal developers can use the
+[Google Drive](https://drive.google.com/drive/folders/1sFQmo_UvkY5xSIZKLjXLxlAOpLdI_1jz?usp=drive_link)
+mirror.
 
-## Working with MMD
 
-To import and convert MMD motions in Blender, the [MMD Tools](https://extensions.blender.org/add-ons/mmd-tools/) plugin needs to be installed to Blender.
+## Conventions
+
+Name generic joints after the
+[SMPL-X joint names](https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18).
+
+Install the [MMD Tools](https://extensions.blender.org/add-ons/mmd-tools/) add-on in Blender to
+import and convert MMD motions.
