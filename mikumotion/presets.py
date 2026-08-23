@@ -1368,9 +1368,11 @@ MOCAP_EXPORTS = {
         "scale": 1.0,
         "rotate_z": 0.0,
         "frames": (0, 2000),
+        # this rig has a single spine bone, so it fills the spine1 slot only; listing it
+        # twice would export the same pose under one name twice, which the store rejects
         "bones": [
             "pelvis", "left_upper_leg", "right_upper_leg", "torso",
-            "left_lower_leg", "right_lower_leg", "torso",
+            "left_lower_leg", "right_lower_leg",
             "left_foot", "right_foot", "head",
             "left_upper_arm", "right_upper_arm",
             "left_lower_arm", "right_lower_arm",

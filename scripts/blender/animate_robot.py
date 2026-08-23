@@ -36,12 +36,11 @@ def parse_args():
     return parser.parse_args(argv)
 
 
-def build_scene(motion, urdf_path):
+def build_scene(motion, robot):
     """Build the robot at its rest pose and key the motion onto it. Returns the armature."""
     if "Cube" in bpy.data.objects:
         bpy.data.objects.remove(bpy.data.objects["Cube"], do_unlink=True)
 
-    robot = urdf.RobotModel.from_file(urdf_path)
     tree = robot.to_armature_tree()
     armature = blender.robot_model_to_armature(robot, name=robot.name, with_meshes=True)
     blender.motion_to_armature(motion, armature, tree)
@@ -50,10 +49,12 @@ def build_scene(motion, urdf_path):
 
 def main():
     args = parse_args()
-    motion = MotionStore().read_motion(args.motion)
+    # the robot's own link poses live in its layer, not in the generic export
+    robot = urdf.RobotModel.from_file(args.urdf)
+    motion = MotionStore().read_reference_motion(args.motion, robot.name)
     print(f"{args.motion}: {motion!r}")
 
-    build_scene(motion, args.urdf)
+    build_scene(motion, robot)
     blender_scene.add_ground()
     blender_scene.add_lighting()
     blender_scene.follow_camera(motion, frame_start=1)

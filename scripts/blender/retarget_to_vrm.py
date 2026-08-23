@@ -40,14 +40,15 @@ def parse_args():
 
 def main():
     args = parse_args()
-    motion = MotionStore().read_motion(args.motion)
+    # the robot rig is only a carrier for the motion, so it needs no meshes; its link
+    # poses live in the robot's own layer, not in the generic export
+    robot = urdf.RobotModel.from_file(args.urdf)
+    motion = MotionStore().read_reference_motion(args.motion, robot.name)
     print(f"{args.motion}: {motion!r}")
 
     target = next(obj for obj in bpy.data.objects if obj.type == "ARMATURE")
     print("target armature:", target.name)
 
-    # the robot rig is only a carrier for the motion, so it needs no meshes
-    robot = urdf.RobotModel.from_file(args.urdf)
     tree = robot.to_armature_tree()
     source = blender.robot_model_to_armature(robot, name="retarget_source", with_meshes=False)
     blender.motion_to_armature(motion, source, tree)

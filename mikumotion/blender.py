@@ -1,3 +1,11 @@
+"""
+Everything that runs inside Blender: building armatures, reading a rig's animation into a
+motion, and playing a motion back on a rig.
+
+This module imports ``bpy``, so it only loads inside Blender. The entry points Blender runs
+live in ``scripts/blender/``.
+"""
+
 import os
 
 import numpy as np
@@ -7,39 +15,13 @@ from bpy.types import Object, PoseBone
 from mathutils import Matrix, Quaternion, Vector
 
 from .armature_tree import ArmatureTree
-from .motion_sequence import MotionSequence
+from .motion_sequence import MotionSequence, fill_body_velocities
 from .urdf import RobotModel, rpy_to_quat
 
 
 C = bpy.context
 D = bpy.data
 O = bpy.ops
-
-
-"""
-Generic quick references:
-
-# getting an armature
-armature = D.objects.get("Armature")
-
-# get pose bones
-bones = armature.pose.bones
-
-# get bone location
-bones.get("bone_name").location
-
-# get bone rotation
-bones.get("bone_name").rotation_quaternion
-
-# get bone rotation matrix
-bones.get("bone_name").matrix
-
-# get bone scale
-bones.get("bone_name").scale
-
-# get edit bones
-armature.data.bones
-"""
 
 
 def set_scene_fps(fps: int) -> None:
@@ -86,17 +68,12 @@ def armature_to_motion(
     Reads a Blender armature's animation as a motion; the mirror of
     ``forward_kinematics.robot_log_to_motion``, and the inverse of ``motion_to_armature``.
 
-    Build rigid body motion data from the source armature.
-    The joint motion data is not included in this function, and will be initialized
-    as a properly-dimensioned zero array. The joint motion data will be populated during the
-    IK retargeting phase of the pipeline.
+    Reads body poses only. A rig has no joint angles; those come from the IK solve, which
+    writes them to the robot's own layer.
 
     Args:
         armature: The source armature object.
-        bone_names: The list of bone names to extract.
-
-    Returns:
-        A MotionSequence object containing the motion data.
+        bone_names: The bones to read, in order. They become the motion's body names.
     """
     fps_float = C.scene.render.fps / C.scene.render.fps_base
     start_frame = C.scene.frame_start
@@ -113,14 +90,8 @@ def armature_to_motion(
         fps=fps_float,
     )
 
-    # used to calculate angular velocities
-    body_rotations_euler = np.zeros((n_frames, len(motion.body_names), 3), dtype=np.float32)
-
-    # === extract motion data ===
     for frame in range(n_frames):
-        # navigate to the corresponding frame. frame_set already re-evaluates the
-        # depsgraph, so the pose matrices below are current; an earlier version also
-        # pumped wm.redraw_timer to force that, which cannot run in background Blender.
+        # frame_set re-evaluates the depsgraph, so the pose matrices below are current
         bpy.context.scene.frame_set(start_frame + frame)
         bpy.context.view_layer.update()
 
@@ -133,15 +104,18 @@ def armature_to_motion(
                 print(f"WARNING: cannot find source bone {blender_bone_name}")
                 continue
 
+            # A pose bone's head and matrix are in armature space, so they are only world
+            # poses when the armature object happens to sit at the origin unrotated. Go
+            # through matrix_world so a placed or turned rig exports the same motion.
+            bone_matrix: Matrix = armature.matrix_world @ source_bone.matrix
+
             # bone position is defined by the head
-            bone_position: Vector = source_bone.head.copy()
+            bone_position: Vector = armature.matrix_world @ source_bone.head
             motion.body_positions[frame, idx, :] = bone_position
 
             # get the rotation offset in (w, x, y, z) quaternion
-            bone_rotation: Quaternion = source_bone.matrix.to_quaternion().copy()
+            bone_rotation: Quaternion = bone_matrix.to_quaternion()
             motion.body_rotations[frame, idx, :] = bone_rotation
-
-            body_rotations_euler[frame, idx, :] = bone_rotation.to_euler()
 
         print(f"Processing: #{frame}/{n_frames} ({frame / n_frames * 100:.2f}%)", end="\r")
 
@@ -152,17 +126,7 @@ def armature_to_motion(
     motion.body_positions[:, :, 0] -= offset_x
     motion.body_positions[:, :, 1] -= offset_y
 
-    # calculate velocities
-    motion.body_linear_velocities[1:] = np.diff(motion.body_positions, axis=0) / (1. / fps_float)
-
-    # calculate angular velocities
-    # handle euler angle discontinuity
-    # TODO: this is not quite correct, we need to use quaternions to calculate angular velocities
-    body_rotations_euler = np.unwrap(body_rotations_euler, axis=0)
-    motion.body_angular_velocities[1:] = np.diff(body_rotations_euler, axis=0) / (1. / fps_float)
-
-    # handle euler angle wrapping
-    motion.body_angular_velocities[:] = np.unwrap(motion.body_angular_velocities, axis=0)
+    fill_body_velocities(motion)
 
     print(f"Done generating {n_frames} frames ({n_frames / fps_float:.2f} seconds)")
 
@@ -178,22 +142,14 @@ def translation_rotation_to_matrix(
     return Matrix.Translation(Vector(translation)) @ quat.to_matrix().to_4x4()
 
 
-def build_armature(
-    tree: ArmatureTree,
-    name="Armature",
-    default_length=0.1,
-    show_names=True,
-    show_axes=True,
-):
+def build_armature(tree: ArmatureTree, name="Armature", default_length=0.1):
     """
     Build an armature from an ArmatureTree.
 
     Args:
         tree: The ArmatureTree to build the armature from.
         name: The name of the armature.
-        default_length: The default length of the bones (applied to leaf bones).
-        show_names: Whether to show the names of the bones on the armature.
-        show_axes: Whether to show the axes of the bones on the armature.
+        default_length: The length given to leaf bones.
     """
     # ensure we start in OBJECT mode; the scene's active object may currently be in
     # EDIT or POSE mode (e.g. another armature), which makes object operators fail with
@@ -290,8 +246,8 @@ def build_armature(
     for bone in bones:
         bone.rotation_mode = "XYZ"
 
-    armature.data.show_names = show_names
-    armature.data.show_axes = show_axes
+    armature.data.show_names = False
+    armature.data.show_axes = False
 
 
 # ============================================================
@@ -435,7 +391,7 @@ def robot_model_to_armature(robot: RobotModel, name: str, with_meshes: bool) -> 
         The created armature Object.
     """
     tree = robot.to_armature_tree()
-    build_armature(tree, name=name, default_length=BONE_LENGTH, show_names=False, show_axes=False)
+    build_armature(tree, name=name, default_length=BONE_LENGTH)
     armature = D.objects.get(name)
 
     # ensure the armature sits at the world origin so link world transforms == placement
@@ -603,16 +559,6 @@ def get_rest_world_matrix(arm_obj, bone_name) -> Matrix:
     return arm_obj.matrix_world @ arm_obj.data.bones[bone_name].matrix_local
 
 
-def get_pose_world_matrix(arm_obj, bone_name) -> Matrix:
-    return arm_obj.matrix_world @ arm_obj.pose.bones[bone_name].matrix
-
-
-def get_source_delta_world(source_obj, source_bone_name) -> Matrix:
-    """How far the source bone has moved from its own rest pose, in world space."""
-    rest = get_rest_world_matrix(source_obj, source_bone_name)
-    return get_pose_world_matrix(source_obj, source_bone_name) @ rest.inverted()
-
-
 def build_bone_map(source_obj, target_obj, bone_map) -> "dict[str, str]":
     """Drop any target<-source pair naming a bone that one of the armatures lacks."""
     valid = {}
@@ -637,7 +583,10 @@ def desired_pose_matrix(source_obj, target_obj, source_bone_name, target_bone_na
     VRM's head->tail bones. Mapping through the rest orientations instead
     (R_target_rest . R_source_rest^-1 . R_source_pose) silently mangles such a pair.
     """
-    source_delta = rot3_orthonormalized(get_source_delta_world(source_obj, source_bone_name).to_3x3())
+    # how far the source bone has moved from its own rest pose, in world space
+    source_pose = source_obj.matrix_world @ source_obj.pose.bones[source_bone_name].matrix
+    source_rest = get_rest_world_matrix(source_obj, source_bone_name)
+    source_delta = rot3_orthonormalized((source_pose @ source_rest.inverted()).to_3x3())
     target_rest = rot3_orthonormalized(get_rest_world_matrix(target_obj, target_bone_name).to_3x3())
     desired_world = rot3_orthonormalized(source_delta @ target_rest)
 

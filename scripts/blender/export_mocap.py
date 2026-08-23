@@ -11,7 +11,8 @@ for example:
 
     blender ./blender-projects/Zamuza.blend --python scripts/blender/export_mocap.py -- zamuza
 
-Then solve a robot's joints for it with `mikumotion retarget <preset> <robot.xml>`.
+Then solve a robot's joints for it with
+`mikumotion retarget <preset> <robot.xml> <robot.urdf> <map>`.
 """
 
 import os
@@ -43,7 +44,7 @@ def export(armature, preset, name, store):
     motion = rotate_motion(motion, preset["rotate_z"])
 
     print(f"{name}: {motion!r}")
-    print(f"  {store.write_motion(name, motion)}")
+    print(f"  {store.write_reference_motion(name, motion)}")
 
 
 def main():

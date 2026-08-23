@@ -1,33 +1,60 @@
 """
 The motion sequence — the central data structure of MikuMotionTools — and the Rerun
-``.rrd`` store it lives in. Every other module is a converter into or out of this format.
+``.rrd`` store it lives in. Every other module converts into or out of this format.
 
-A :class:`MotionSequence` is the in-memory form: plain numpy arrays that converters
-allocate and fill. :class:`MotionStore` is the on-disk form, a Rerun recording. They live
-together because they are one thing described twice, and the field list below is the only
-place that description is written down.
+:class:`MotionSequence` is the in-memory form: plain numpy arrays that converters fill.
+:class:`MotionStore` is the on-disk form, a Rerun recording.
 
-Layout under ``root`` (default ``data/motions/``), following the Rerun dataset convention
+A layer is a pipeline stage. A file is one motion segment: a dance, an episode, a take.
+The layout under ``root`` (default ``data/motions/``) follows the Rerun dataset convention
 of one directory per layer and one file per motion:
 
-    base/       <name>.rrd   the motion sequence itself — this is what training consumes
-    preview/    <name>.rrd   joint transforms that animate the robot in the viewer
-    robot/      <robot>.rrd  URDF geometry + static transforms, shared by every motion
-    blueprints/ <robot>.rbl  viewer layout used when previewing a motion on its robot
+    reference/  <motion>.rrd  body poses as exported, robot-agnostic
+    <robot>/    <motion>.rrd  what solving that motion for one robot produced
+    blueprints/ <robot>.rbl   viewer layout for that robot
 
-``base/<name>.rrd`` is self-sufficient and needs no robot model: it carries the joint
-names/positions/velocities and the world-frame body transforms and velocities. The other
-layers exist only so a human can *watch* the motion, which is why the geometry is stored
-once per robot rather than once per motion, and why a training job can pull ``base/``
-alone.
+``reference/`` holds the world-frame body poses and velocities a solve aims at. It has no
+joints and needs no robot model. Each ``<robot>/`` layer holds that robot's joint positions
+and velocities, and the body poses the solve reached. It also holds the robot's URDF
+geometry and the transforms that animate it.
 
-Rerun composes data only within a single recording, so previewing a motion means
-rewriting the shared layers onto the motion's recording id and merging them (see
-:mod:`mikumotion.cli`). Every recording uses ``application_id = "mikumotion"`` and
-``recording_id = <motion name>`` so catalog queries stay predictable.
+Both layers store bodies the same way, so one writer and one reader serve both:
 
-This module is the only place that touches the Rerun read/write APIs or the quaternion
-order difference (Rerun is xyzw, MotionSequence is wxyz), so an SDK change is a one-file fix.
+    /<layer>/body/poses/<name>        Transform3D, one entity per body, one row per frame
+    /<layer>/body/frames/<name>       a gizmo bound to a coordinate frame, static
+    /<layer>/body/linear_velocities   Arrows3D, one row per frame, every body an instance
+    /<layer>/body/angular_velocities  Arrows3D
+    /<robot>/joint/positions          Scalars, one row per frame, every joint an instance
+    /<robot>/joint/velocities         Scalars
+    /<robot>/tf                       Transform3D per joint, plus the root link's placement
+    /<robot>/tf_static                the URDF's fixed transforms
+    /<robot>/visual_geometries/...    the URDF's geometry, named by Rerun's URDF loader
+
+The two pose sets are different data, not a duplicate. ``reference/`` is what the IK aims
+at, and what a training run tracks. ``<robot>/`` is what the IK reached.
+
+A robot's body poses name their own frames, ``<robot>/body/<link>``. The joint chain in
+``/<robot>/tf`` already defines the URDF link frames of the same name, and a frame can have
+only one parent.
+
+Every entity drawn in 3D must name a frame, even one that needs no transform. An entity with
+no frame is an orphan. The viewer invents ``tf#<entity path>`` for it, finds no route to the
+view's root, and draws an error in place of the entity. Scalars are exempt, because the
+viewer plots them against time rather than placing them in the scene.
+
+Filenames match across layers, so ``reference/zamuza.rrd`` and ``lite_pro/zamuza.rrd`` are
+one segment at two stages. Every layer shares ``application_id = "mikumotion"`` and
+``recording_id = <motion>``. The viewer pools layers by those two ids, so
+``rerun data/motions/*/<motion>.rrd`` opens them as one recording.
+
+A robot layer puts its entities under ``/<robot>/`` and prefixes its URDF frames and static
+transforms the same way. Two robots, or a robot and the reference rig, would otherwise write
+the same entity paths and overwrite each other. Each motion's robot layer carries its own
+copy of the geometry. A shared file would need a different recording id, and Rerun cannot
+compose a second recording against the motion (rerun-io/rerun#7316).
+
+This module is the only place that touches the Rerun read and write APIs, or the quaternion
+order difference (Rerun is xyzw, MotionSequence is wxyz).
 """
 
 from pathlib import Path
@@ -41,7 +68,9 @@ from .math import euler_zyx_to_quat, quat_mul
 
 APP_ID = "mikumotion"
 TIMELINE = "frame"
-BODY_BOX_SIZE = (0.02, 0.02, 0.02)  # how big each body is drawn when there is no robot mesh
+REFERENCE = "reference"  # the robot-agnostic layer, both on disk and in entity paths
+AXIS_LENGTH = 0.15  # metres; long enough to clear the robot's limbs, which would hide it
+AXIS_WIDTH = 0.004
 
 #: The per-frame arrays a motion is made of. Single source of truth for copying and storage.
 ARRAY_FIELDS = (
@@ -138,6 +167,33 @@ class MotionSequence:
         return other
 
 
+def fill_body_velocities(motion):
+    """
+    Fill the body velocity arrays by differentiating the pose trajectory.
+
+    Every producer calls this instead of differencing poses itself, because the angular
+    part has two traps. It must come from the rotation between consecutive frames, because
+    Euler-angle rates are not an angular velocity. That rotation must also be taken the
+    short way round, because a quaternion can flip sign between frames and the flipped one
+    reads as a near-full turn, spiking at 2*pi*fps.
+
+    Frame 0 keeps its zeros. There is no earlier pose to difference against.
+    """
+    dt = 1.0 / motion.fps
+    motion.body_linear_velocities[1:] = np.diff(motion.body_positions, axis=0) / dt
+
+    conjugate = motion.body_rotations[:-1] * np.array([1.0, -1.0, -1.0, -1.0])
+    step = quat_mul(motion.body_rotations[1:], conjugate)  # world-frame, so post-multiply
+    step = np.where(step[..., :1] < 0.0, -step, step)      # the short way round
+
+    axis = step[..., 1:]
+    sin_half = np.linalg.norm(axis, axis=-1)
+    angle = 2.0 * np.arctan2(sin_half, step[..., 0])
+    # angle / sin_half tends to 2 as the step vanishes, which is the value to use there
+    scale = np.divide(angle, sin_half, out=np.full_like(angle, 2.0), where=sin_half > 1e-12)
+    motion.body_angular_velocities[1:] = axis * (scale / dt)[..., None]
+
+
 def rotate_motion(motion, z_rotation):
     """
     Return a copy of ``motion`` rotated about the world Z axis by ``z_rotation`` radians.
@@ -184,19 +240,91 @@ def quat_to_wxyz(quat_xyzw):
     return np.stack([q[..., 3], q[..., 0], q[..., 1], q[..., 2]], axis=-1)
 
 
-def motion_blueprint():
-    """
-    Viewer layout: the robot in 3D beside its joint-angle plots, with the timeline open.
+def body_poses_path(layer, body_name):
+    """Where a body's pose lives. The name is escaped: MMD bones are Japanese."""
+    return f"/{layer}/body/poses/{rr.escape_entity_path_part(body_name)}"
 
-    Velocities are excluded from the 3D view. They are stored as vectors without origins,
-    so drawing them would fan every arrow out of the world origin; they remain in the
-    recording as data and can be switched on from the entity tree.
+
+def body_frames_path(layer, body_name):
+    """Where the gizmo drawn on a body's frame lives."""
+    return f"/{layer}/body/frames/{rr.escape_entity_path_part(body_name)}"
+
+
+def body_frame(layer, body_name):
+    """
+    A body's coordinate frame.
+
+    The layer prefix keeps a reference body apart from a robot's link of the same name. It
+    also keeps a robot's ``<robot>/body/<link>`` apart from ``<robot>/<link>``, the URDF link
+    frame that its joint chain defines. A frame can have only one parent.
+    """
+    return f"{layer}/body/{body_name}"
+
+
+def axis_triad():
+    """
+    A red/green/blue gizmo along +X/+Y/+Z, as one mesh of three thin boxes.
+
+    This is geometry rather than ``TransformAxes3D`` because only geometry can be bound to
+    a coordinate frame. A 3D view that holds both frame-bound geometry and entity-transform
+    axes draws neither.
+    """
+    corners = np.array([[0, -1, -1], [0, -1, 1], [0, 1, -1], [0, 1, 1],
+                        [1, -1, -1], [1, -1, 1], [1, 1, -1], [1, 1, 1]], dtype=np.float32)
+    faces = np.array([[0, 1, 3], [0, 3, 2], [4, 7, 5], [4, 6, 7], [0, 5, 1], [0, 4, 5],
+                      [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]],
+                     dtype=np.uint32)
+    arm = corners * (AXIS_LENGTH, AXIS_WIDTH, AXIS_WIDTH)
+
+    positions, triangles, colors = [], [], []
+    for axis, color in enumerate(((255, 70, 70), (70, 220, 70), (90, 140, 255))):
+        positions.append(np.roll(arm, axis, axis=1))  # swing the arm onto X, then Y, then Z
+        triangles.append(faces + axis * len(corners))
+        colors.append(np.tile(color, (len(corners), 1)))
+    return rr.Mesh3D(vertex_positions=np.concatenate(positions),
+                     triangle_indices=np.concatenate(triangles),
+                     vertex_colors=np.concatenate(colors).astype(np.uint8))
+
+
+def hidden_velocities(layer):
+    """
+    Rules that hide one layer's velocity arrows.
+
+    The velocities are vectors without origins, so every arrow would fan out of the world
+    origin. They stay in the recording, and you can switch them on in the viewer. Each entity
+    needs its own rule: a view filter matches a whole path part or a ``/**`` subtree, never a
+    partial name.
+    """
+    return [f"- /{layer}/body/linear_velocities", f"- /{layer}/body/angular_velocities"]
+
+
+def reference_blueprint():
+    """Viewer layout for an exported motion: the body frames in 3D, timeline open."""
+    return rrb.Blueprint(
+        rrb.Spatial3DView(origin="/", name="motion",
+                          contents=["+ $origin/**"] + hidden_velocities(REFERENCE)),
+        rrb.TimePanel(state="expanded"),
+    )
+
+
+def robot_blueprint(robot):
+    """
+    Viewer layout for a motion solved onto ``robot``: the robot in 3D beside its joint-angle
+    plots, with the reference gizmos drawn on top of it.
+
+    Seeing both is the point. The reference frames are what the IK aims at, so the gap
+    between them and the robot's links is the retarget's error, frame by frame.
+
+    The robot's *own* link frames stay hidden. They exist at ``/<robot>/body/frames/<link>``
+    and you can switch any one on from the entity tree, but all 75 at once bury the robot.
     """
     return rrb.Blueprint(
         rrb.Horizontal(
-            rrb.Spatial3DView(origin="/", name="robot",
-                              contents=["+ $origin/**", "- /velocities/**"]),
-            rrb.TimeSeriesView(origin="/signals/joint", name="joint angles"),
+            rrb.Spatial3DView(origin="/", name=robot,
+                              contents=["+ $origin/**", f"- /{robot}/body/frames/**"]
+                                       + hidden_velocities(REFERENCE)
+                                       + hidden_velocities(robot)),
+            rrb.TimeSeriesView(origin=f"/{robot}/joint/positions", name="joint angles"),
             column_shares=[3, 1],
         ),
         rrb.TimePanel(state="expanded"),
@@ -250,6 +378,21 @@ def read_entity_columns(path):
     return columns
 
 
+def read_entity_components(path):
+    """
+    Every entity in an ``.rrd`` and the components on it, static entities included.
+
+    ``read_entity_columns`` sees only what is on the timeline, so geometry, gizmos and the
+    URDF's static transforms are invisible to it.
+    """
+    store = rr.experimental.RrdReader(str(path)).store()
+    components = {}
+    for chunk in store.stream():
+        names = {field.name for field in chunk.to_record_batch().schema}
+        components.setdefault(str(chunk.entity_path), set()).update(names)
+    return components
+
+
 def read_properties(path):
     """Read the recording properties (fps, robot, joint_names, body_names) from an ``.rrd``."""
     store = rr.experimental.RrdReader(str(path)).store()
@@ -265,160 +408,215 @@ def read_properties(path):
     return properties
 
 
+def send_body_columns(stream, layer, motion):
+    """
+    Write one layer's body poses and velocities under ``/<layer>/body/``.
+
+    Each body gets its own entity, so a body is addressable by name. The velocities stay in
+    one batched entity each, one row per frame. A row per body would spend more bytes on
+    Rerun row ids than on the data. They are siblings of the poses, not children: an
+    Arrows3D below a posed entity inherits the pose and turns its vectors.
+    """
+    repeated = {body for body in motion.body_names if motion.body_names.count(body) > 1}
+    assert not repeated, (
+        f"body names must be unique, but {sorted(repeated)} repeat. Each body is stored at "
+        f"/{layer}/body/poses/<name>, so two bodies sharing a name would overwrite each other. "
+        f"A mocap preset that fills two SMPL slots from one bone needs a distinct name for "
+        f"the second slot (see MOCAP_EXPORTS in mikumotion.presets), and a retarget map needs "
+        f"a distinct link per source body (see RETARGET_MAPS)."
+    )
+    frames = rr.TimeColumn(TIMELINE, sequence=np.arange(motion.num_frames))
+    for index, body in enumerate(motion.body_names):
+        # The pose names a frame, the shape the URDF importer uses. Every layer is then one
+        # graph rooted at "world", so a layer's gizmos and a robot's geometry share one view.
+        rr.send_columns(body_poses_path(layer, body), [frames], rr.Transform3D.columns(
+            translation=motion.body_positions[:, index],
+            quaternion=quat_to_xyzw(motion.body_rotations[:, index]),
+            child_frame=[body_frame(layer, body)] * motion.num_frames,
+            parent_frame=["world"] * motion.num_frames,
+        ), recording=stream)
+
+    bodies_per_frame = [motion.num_bodies] * motion.num_frames
+    for name, vectors in (("linear", motion.body_linear_velocities),
+                          ("angular", motion.body_angular_velocities)):
+        # The velocities are world-frame vectors, so say so. An entity that names no frame
+        # is an orphan, and the viewer draws an error in its place.
+        rr.log(f"/{layer}/body/{name}_velocities", rr.CoordinateFrame(frame="world"),
+               static=True, recording=stream)
+        rr.send_columns(f"/{layer}/body/{name}_velocities", [frames], rr.Arrows3D.columns(
+            vectors=vectors.reshape(-1, 3),
+        ).partition(bodies_per_frame), recording=stream)
+
+
 class MotionStore:
     """A directory of Rerun motion layers. See the module docstring for the layout."""
 
     def __init__(self, root="data/motions"):
         self.root = Path(root)
 
-    def motion_file(self, name):
-        return self.root / "base" / f"{name}.rrd"
+    def reference_file(self, name):
+        return self.root / REFERENCE / f"{name}.rrd"
 
-    def preview_file(self, name):
-        return self.root / "preview" / f"{name}.rrd"
-
-    def robot_file(self, robot):
-        return self.root / "robot" / f"{robot}.rrd"
+    def robot_file(self, name, robot):
+        return self.root / robot / f"{name}.rrd"
 
     def blueprint_file(self, robot):
         return self.root / "blueprints" / f"{robot}.rbl"
 
-    def write_motion(self, name, motion):
-        """
-        Write a MotionSequence as ``base/<name>.rrd``.
+    def robots(self, name):
+        """Which robots this motion has been solved for, from the layers on disk."""
+        layers = (path for path in self.root.iterdir() if path.is_dir())
+        return sorted(layer.name for layer in layers
+                      if layer.name not in (REFERENCE, "blueprints")
+                      and (layer / f"{name}.rrd").exists())
 
-        Takes no robot model: a motion exported from a Blender armature has no URDF, and
-        training does not need one. Call ``write_preview`` to make the motion viewable.
+    def write_reference_motion(self, name, motion):
         """
-        frames = rr.TimeColumn(TIMELINE, sequence=np.arange(motion.num_frames))
+        Write the export stage as ``reference/<name>.rrd``: body poses and velocities, no
+        robot.
 
-        path = self.motion_file(name)
+        Joints are never written here, even when the sequence carries them. A joint angle
+        only means something for one robot, so it belongs to that robot's layer.
+        """
+        path = self.reference_file(name)
         path.parent.mkdir(parents=True, exist_ok=True)
         with rr.RecordingStream(APP_ID, recording_id=name) as stream:
-            stream.save(path, motion_blueprint())
+            stream.save(path, reference_blueprint())
             rr.send_property("motion", rr.AnyValues(
+                fps=motion.fps,
+                body_names=list(motion.body_names),
+            ), recording=stream)
+
+            send_body_columns(stream, REFERENCE, motion)
+            for body in motion.body_names:
+                rr.log(body_frames_path(REFERENCE, body), axis_triad(),
+                       rr.CoordinateFrame(frame=body_frame(REFERENCE, body)),
+                       static=True, recording=stream)
+        return path
+
+    def write_robot_motion(self, name, motion, urdf_path):
+        """
+        Write the solve stage as ``<robot>/<name>.rrd``, plus that robot's viewer layout.
+
+        The layer holds the robot's joints, the body poses the solve reached, and the
+        robot's geometry, so the file animates the robot on its own. Everything sits under
+        ``/<robot>/``, including the URDF's frames and its static transforms, so you can open
+        a second robot beside it.
+
+        The body poses are the robot's own links, not the reference rig's. ``reference/`` keeps
+        what the solve aims at, and the gap between the two is the retarget's error.
+
+        ``motion`` carries the robot's joints and, in ``body_names``, at least the root link.
+        """
+        robot = rr.urdf.UrdfTree.from_file_path(urdf_path).name
+        tree = rr.urdf.UrdfTree.from_file_path(
+            urdf_path, frame_prefix=f"{robot}/",
+            static_transform_entity_path=f"{robot}/tf_static")
+        frames = rr.TimeColumn(TIMELINE, sequence=np.arange(motion.num_frames))
+        prefix = f"/{robot}"
+
+        blueprint = self.blueprint_file(robot)
+        blueprint.parent.mkdir(parents=True, exist_ok=True)
+        robot_blueprint(robot).save(APP_ID, blueprint)
+
+        path = self.robot_file(name, robot)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with rr.RecordingStream(APP_ID, recording_id=name) as stream:
+            stream.save(path, robot_blueprint(robot))
+            rr.send_property(robot, rr.AnyValues(
+                robot=robot,
                 fps=motion.fps,
                 joint_names=list(motion.joint_names),
                 body_names=list(motion.body_names),
             ), recording=stream)
 
-            # World-frame body poses, body velocities and joint signals. Each is one entity
-            # holding every body/joint as an instance, so there is a single row per frame:
-            # a row per body would spend more bytes on Rerun row ids than on the data.
-            # The velocity arrows carry vectors only; origins would duplicate body_positions.
-            bodies_per_frame = [motion.num_bodies] * motion.num_frames
+            tree.log_urdf_to_recording(recording=stream)
+
+            # A gizmo on every link frame, so you can read the solve's own frames off the
+            # robot. These ride the URDF chain, so they cover every link, not only the ones
+            # the solve tracked. The blueprint hides them by default.
+            links = [tree.root_link()] + [tree.get_joint_child(joint) for joint in tree.joints()]
+            for link in links:
+                rr.log(body_frames_path(robot, link.name), axis_triad(),
+                       rr.CoordinateFrame(frame=f"{robot}/{link.name}"),
+                       static=True, recording=stream)
+
+            send_body_columns(stream, robot, motion)
+
             joints_per_frame = [motion.num_joints] * motion.num_frames
-
-            # Bodies are boxes rather than bare poses so the motion is visible on its own:
-            # an InstancePoses3D only re-poses geometry logged elsewhere, so a motion file
-            # opened without its robot layer would render an empty scene. The size is static.
-            rr.log("/bodies", rr.Boxes3D(half_sizes=[BODY_BOX_SIZE] * motion.num_bodies,
-                                         labels=motion.body_names),
-                   static=True, recording=stream)
-            rr.send_columns("/bodies", [frames], rr.Boxes3D.columns(
-                centers=motion.body_positions.reshape(-1, 3),
-                quaternions=quat_to_xyzw(motion.body_rotations).reshape(-1, 4),
-            ).partition(bodies_per_frame), recording=stream)
-
-            rr.send_columns("/velocities/linear", [frames], rr.Arrows3D.columns(
-                vectors=motion.body_linear_velocities.reshape(-1, 3),
-            ).partition(bodies_per_frame), recording=stream)
-            rr.send_columns("/velocities/angular", [frames], rr.Arrows3D.columns(
-                vectors=motion.body_angular_velocities.reshape(-1, 3),
-            ).partition(bodies_per_frame), recording=stream)
-
-            rr.send_columns("/signals/joint", [frames], rr.Scalars.columns(
+            rr.send_columns(f"{prefix}/joint/positions", [frames], rr.Scalars.columns(
                 scalars=motion.joint_positions.reshape(-1),
             ).partition(joints_per_frame), recording=stream)
-            rr.send_columns("/signals/joint_velocity", [frames], rr.Scalars.columns(
+            rr.send_columns(f"{prefix}/joint/velocities", [frames], rr.Scalars.columns(
                 scalars=motion.joint_velocities.reshape(-1),
             ).partition(joints_per_frame), recording=stream)
 
-        return path
-
-    def write_preview(self, name, motion, urdf_path):
-        """
-        Write everything needed to *watch* ``name`` on the robot described by ``urdf_path``:
-        the shared robot geometry and viewer layout, plus a ``preview/<name>.rrd`` layer whose
-        joint transforms animate that geometry.
-
-        This layer restates ``joint_positions`` as per-joint transforms, which is why it is
-        kept out of ``base/`` — it is the largest layer and only a viewer needs it.
-        """
-        tree = rr.urdf.UrdfTree.from_file_path(urdf_path, entity_path_prefix="/robot")
-        frames = rr.TimeColumn(TIMELINE, sequence=np.arange(motion.num_frames))
-
-        robot_path = self.robot_file(tree.name)
-        robot_path.parent.mkdir(parents=True, exist_ok=True)
-        with rr.RecordingStream(APP_ID, recording_id=tree.name) as stream:
-            stream.save(robot_path)
-            tree.log_urdf_to_recording(recording=stream)
-
-        blueprint = self.blueprint_file(tree.name)
-        blueprint.parent.mkdir(parents=True, exist_ok=True)
-        motion_blueprint().save(APP_ID, blueprint)
-
-        path = self.preview_file(name)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with rr.RecordingStream(APP_ID, recording_id=name) as stream:
-            stream.save(path)
-            rr.send_property("preview", rr.AnyValues(robot=tree.name), recording=stream)
-
+            # the frame graph that puts the geometry where the joints say it is
             for joint in tree.joints():
                 if joint.name not in motion.joint_names:
                     continue
                 angles = motion.joint_positions[:, motion.joint_names.index(joint.name)]
-                rr.send_columns("/tf", [frames], joint.compute_transform_columns(
+                rr.send_columns(f"{prefix}/tf", [frames], joint.compute_transform_columns(
                     angles.astype(np.float64), clamp=False), recording=stream)
 
             root = tree.root_link().name
             index = motion.body_names.index(root)
-            rr.send_columns("/tf", [frames], rr.Transform3D.columns(
+            rr.send_columns(f"{prefix}/tf", [frames], rr.Transform3D.columns(
                 translation=motion.body_positions[:, index],
                 quaternion=quat_to_xyzw(motion.body_rotations[:, index]),
-                child_frame=[root] * motion.num_frames,
+                child_frame=[f"{robot}/{root}"] * motion.num_frames,
                 parent_frame=["world"] * motion.num_frames,
             ), recording=stream)
 
         return path
 
-    def read_motion(self, name):
-        """Read ``base/<name>.rrd`` back into a MotionSequence."""
-        path = self.motion_file(name)
+    def read_reference_motion(self, name, robot=None):
+        """
+        Read the export stage, ``reference/<name>.rrd``, back into a MotionSequence.
+
+        With ``robot``, this also reads that robot's solved joints from ``<robot>/<name>.rrd``
+        and carries them on the same sequence. The body poses stay the reference rig's either
+        way, because that is what a training run tracks. The robot layer keeps the poses the
+        robot itself reached, beside its joints at ``/<robot>/body/poses/<link>``.
+        """
+        path = self.reference_file(name)
         properties = read_properties(path)
         columns = read_entity_columns(path)
 
-        bodies = columns["/bodies"]
+        # bodies are looked up by name rather than read off in file order, which no
+        # archetype promises to preserve
+        body_names = [str(value) for value in properties["body_names"]]
+        poses = [columns[body_poses_path(REFERENCE, body)] for body in body_names]
+
         motion = MotionSequence(
-            num_frames=len(bodies["centers"]),
-            # a motion exported from a mocap armature has bodies but no joints, and an
-            # empty name list is not written at all, so treat it as absent
-            joint_names=[str(value) for value in properties.get("joint_names", [])],
-            body_names=[str(value) for value in properties["body_names"]],
+            num_frames=len(poses[0]["translation"]),
+            joint_names=[],  # joints belong to a robot layer, never to the reference
+            body_names=body_names,
             fps=int(properties["fps"][0]),
         )
-        motion.body_positions[:] = bodies["centers"]
-        motion.body_rotations[:] = quat_to_wxyz(bodies["quaternions"])
-        motion.body_linear_velocities[:] = columns["/velocities/linear"]["vectors"]
-        motion.body_angular_velocities[:] = columns["/velocities/angular"]["vectors"]
+        # a Transform3D row is a batch of one, so drop that instance axis
+        for index, pose in enumerate(poses):
+            motion.body_positions[:, index] = pose["translation"].reshape(-1, 3)
+            motion.body_rotations[:, index] = quat_to_wxyz(pose["quaternion"].reshape(-1, 4))
+        motion.body_linear_velocities[:] = columns[f"/{REFERENCE}/body/linear_velocities"]["vectors"]
+        motion.body_angular_velocities[:] = columns[f"/{REFERENCE}/body/angular_velocities"]["vectors"]
 
-        if motion.num_joints:
-            motion.joint_positions[:] = columns["/signals/joint"]["scalars"]
-            motion.joint_velocities[:] = columns["/signals/joint_velocity"]["scalars"]
+        if robot is not None:
+            robot_path = self.robot_file(name, robot)
+            robot_columns = read_entity_columns(robot_path)
+            motion.joint_names = [str(value) for value in read_properties(robot_path)["joint_names"]]
+            motion.joint_positions = robot_columns[f"/{robot}/joint/positions"]["scalars"]
+            motion.joint_velocities = robot_columns[f"/{robot}/joint/velocities"]["scalars"]
         return motion
 
     def layer_paths(self, name):
         """
         Every file that makes up ``name``, for handing to the Rerun viewer.
 
-        A motion that was never given a preview layer is still viewable — you just get its
-        body poses and signals rather than the robot's geometry.
+        The layers share a recording id, so opening them together is all the composition
+        Rerun needs. A motion with no robot layer is still viewable, as body gizmos.
         """
-        paths = [self.motion_file(name)]
-        preview = self.preview_file(name)
-        if not preview.exists():
-            return paths
-
-        robot = str(read_properties(preview)["robot"][0])
-        paths += [preview, self.robot_file(robot), self.blueprint_file(robot)]
+        paths = [self.reference_file(name)]
+        for robot in self.robots(name):
+            paths += [self.robot_file(name, robot), self.blueprint_file(robot)]
         return [path for path in paths if path.exists()]
