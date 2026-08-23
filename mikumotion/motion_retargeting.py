@@ -237,5 +237,8 @@ class MotionRetargetingIK:
         if viewer is not None:
             viewer.close()
 
-        path = self.store.write_robot_motion(self.motion_name, self.target_motion, self.urdf_path)
+        # the solve pairs two rigs that do not share a vocabulary, so the file records which
+        # reference body each robot link was solved from
+        path = self.store.write_robot_motion(self.motion_name, self.target_motion,
+                                             self.urdf_path, list(self.retargeted_bodies))
         print(f"Results saved to {path}")

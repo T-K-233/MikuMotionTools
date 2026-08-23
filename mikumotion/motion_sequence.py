@@ -30,6 +30,12 @@ Both layers store bodies the same way, so one writer and one reader serve both:
     /<robot>/tf_static                the URDF's fixed transforms
     /<robot>/visual_geometries/...    the URDF's geometry, named by Rerun's URDF loader
 
+A robot layer names its bodies after the robot's own links, and the reference layer names
+its bodies after the source rig. For zamuza on lite_pro those are two different vocabularies,
+``torso`` against ``chest``. The robot layer's ``reference_body_names`` property records the
+pairing, one reference body per entry of ``body_names``, so a reader can line the two layers
+up without knowing which retarget map produced the file.
+
 The two pose sets are different data, not a duplicate. ``reference/`` is what the IK aims
 at, and what a training run tracks. ``<robot>/`` is what the IK reached.
 
@@ -419,7 +425,10 @@ def read_blueprint_overrides(path):
 
 
 def read_properties(path):
-    """Read the recording properties (fps, robot, joint_names, body_names) from an ``.rrd``."""
+    """
+    Read a recording's properties: fps and body_names, plus robot, joint_names and
+    reference_body_names on a robot layer.
+    """
     store = rr.experimental.RrdReader(str(path)).store()
     properties = {}
     for chunk in store.stream():
@@ -519,7 +528,7 @@ class MotionStore:
                        static=True, recording=stream)
         return path
 
-    def write_robot_motion(self, name, motion, urdf_path):
+    def write_robot_motion(self, name, motion, urdf_path, reference_body_names=None):
         """
         Write the solve stage as ``<robot>/<name>.rrd``, plus that robot's viewer layout.
 
@@ -532,6 +541,11 @@ class MotionStore:
         what the solve aims at, and the gap between the two is the retarget's error.
 
         ``motion`` carries the robot's joints and, in ``body_names``, at least the root link.
+
+        ``reference_body_names`` names the reference body each of those bodies was solved
+        from, in the same order, because a retarget pairs two rigs that do not share a
+        vocabulary. Leave it out when the bodies are already the reference's own, as they are
+        for an imported log, and the pairing is recorded as the identity it is.
         """
         robot = rr.urdf.UrdfTree.from_file_path(urdf_path).name
         tree = rr.urdf.UrdfTree.from_file_path(
@@ -553,6 +567,7 @@ class MotionStore:
                 fps=motion.fps,
                 joint_names=list(motion.joint_names),
                 body_names=list(motion.body_names),
+                reference_body_names=list(reference_body_names or motion.body_names),
             ), recording=stream)
 
             tree.log_urdf_to_recording(recording=stream)
