@@ -5,7 +5,8 @@ import pytest
 
 from mikumotion.motion_sequence import (REFERENCE, MotionSequence, MotionStore, body_frame,
                                         fill_body_velocities, quat_to_wxyz, quat_to_xyzw,
-                                        read_entity_columns, read_entity_components)
+                                        read_blueprint_overrides, read_entity_columns,
+                                        read_entity_components)
 
 URDF = """<?xml version="1.0"?>
 <robot name="testbot">
@@ -247,6 +248,26 @@ def test_every_spatial_entity_is_attached_to_the_frame_graph(store):
             if entity.startswith("/__") or not spatial:
                 continue
             assert components & anchors, f"{entity} names no frame: {sorted(components)}"
+
+
+def test_the_blueprint_hides_entities_instead_of_excluding_them(store):
+    """
+    A hidden entity stays in the view, so the entity tree lists it and one click brings it
+    back. An excluded one vanishes from the tree, and only the view's filter can recover it.
+    The robot's 75 link gizmos bury the robot, so they start off, but they must stay findable.
+    """
+    hidden = read_blueprint_overrides(store.robot_file("clip", "testbot"))
+    assert "/testbot/body/frames" in hidden
+    assert {"/testbot/body/linear_velocities", "/reference/body/linear_velocities"} <= hidden
+
+    # the reference gizmos are what the IK aimed at, so they are the one thing left visible
+    assert not any(path.startswith("/reference/body/frames") for path in hidden), hidden
+
+
+def test_a_motion_opened_alone_hides_its_velocity_arrows(store):
+    """Both layers embed a blueprint, so either file opens sensibly on its own."""
+    assert read_blueprint_overrides(store.reference_file("clip")) == {
+        "/reference/body/linear_velocities", "/reference/body/angular_velocities"}
 
 
 def test_robot_layers_do_not_collide(tmp_path):

@@ -288,21 +288,21 @@ def axis_triad():
 
 def hidden_velocities(layer):
     """
-    Return the view rules that hide one layer's velocity arrows.
+    Return the overrides that start one layer's velocity arrows switched off.
 
     The velocities are vectors without origins, so every arrow would fan out of the world
-    origin. They stay in the recording, and you can switch them on in the viewer. Each entity
-    needs its own rule: a view filter matches a whole path part or a ``/**`` subtree, never a
-    partial name.
+    origin. This hides them rather than excluding them from the view, so they still appear in
+    the entity tree and one click brings them back. An excluded entity is not in the view at
+    all, and the only way back is to edit the view's filter.
     """
-    return [f"- /{layer}/body/linear_velocities", f"- /{layer}/body/angular_velocities"]
+    return {f"/{layer}/body/{quantity}_velocities": rrb.EntityBehavior(visible=False)
+            for quantity in ("linear", "angular")}
 
 
 def reference_blueprint():
     """Return the viewer layout for an exported motion: body frames in 3D, timeline open."""
     return rrb.Blueprint(
-        rrb.Spatial3DView(origin="/", name="motion",
-                          contents=["+ $origin/**"] + hidden_velocities(REFERENCE)),
+        rrb.Spatial3DView(origin="/", name="motion", overrides=hidden_velocities(REFERENCE)),
         rrb.TimePanel(state="expanded"),
     )
 
@@ -315,15 +315,16 @@ def robot_blueprint(robot):
     Seeing both is the point. The reference frames are what the IK aims at, so the gap
     between them and the robot's links is the retarget's error, frame by frame.
 
-    The robot's *own* link frames stay hidden. They exist at ``/<robot>/body/frames/<link>``
-    and you can switch any one on from the entity tree, but all 75 at once bury the robot.
+    The robot's *own* link frames start switched off, because all 75 at once bury the robot.
+    They are still in the view, at ``/<robot>/body/frames/<link>``, so the entity tree lists
+    them and one click brings any of them back. The override sits on the parent, so it covers
+    the whole subtree.
     """
+    hidden = ({f"/{robot}/body/frames": rrb.EntityBehavior(visible=False)}
+              | hidden_velocities(REFERENCE) | hidden_velocities(robot))
     return rrb.Blueprint(
         rrb.Horizontal(
-            rrb.Spatial3DView(origin="/", name=robot,
-                              contents=["+ $origin/**", f"- /{robot}/body/frames/**"]
-                                       + hidden_velocities(REFERENCE)
-                                       + hidden_velocities(robot)),
+            rrb.Spatial3DView(origin="/", name=robot, overrides=hidden),
             rrb.TimeSeriesView(origin=f"/{robot}/joint/positions", name="joint angles"),
             column_shares=[3, 1],
         ),
@@ -393,6 +394,28 @@ def read_entity_components(path):
         names = {field.name for field in chunk.to_record_batch().schema}
         components.setdefault(str(chunk.entity_path), set()).update(names)
     return components
+
+
+def read_blueprint_overrides(path):
+    """
+    Return the entity paths that a file's blueprint starts switched off.
+
+    Hiding an entity is not the same as excluding it. A hidden entity is still in the view,
+    so the entity tree lists it and one click brings it back. An excluded one is not in the
+    view at all, and only editing the view's filter can recover it.
+    """
+    reader = rr.experimental.RrdReader(str(path))
+    hidden = set()
+    for entry in reader.blueprints():
+        for chunk in reader.stream(store=entry):
+            batch = chunk.to_record_batch()
+            for field in batch.schema:
+                if not field.name.endswith("EntityBehavior:visible"):
+                    continue
+                if [False] in batch.column(field.name).to_pylist():
+                    override = str(chunk.entity_path).split("/overrides/")[-1]
+                    hidden.add("/" + override.removesuffix("/visualizers"))
+    return hidden
 
 
 def read_properties(path):
