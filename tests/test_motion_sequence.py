@@ -5,7 +5,7 @@ import pytest
 
 from mikumotion.motion_sequence import (REFERENCE, MotionSequence, MotionStore, body_frame,
                                         fill_body_velocities, quat_to_wxyz, quat_to_xyzw,
-                                        read_blueprint_overrides, read_entity_columns,
+                                        read_blueprint_overrides, read_entity_columns, read_properties,
                                         read_entity_components)
 
 URDF = """<?xml version="1.0"?>
@@ -268,6 +268,37 @@ def test_a_motion_opened_alone_hides_its_velocity_arrows(store):
     """Both layers embed a blueprint, so either file opens sensibly on its own."""
     assert read_blueprint_overrides(store.reference_file("clip")) == {
         "/reference/body/linear_velocities", "/reference/body/angular_velocities"}
+
+
+def test_a_retarget_records_which_reference_body_drove_each_link(tmp_path):
+    """
+    A retarget pairs two rigs that do not share a vocabulary: the reference calls a body
+    ``torso`` where the robot calls its link ``chest``. Without the pairing in the file, a
+    reader has to know which retarget map produced it.
+    """
+    urdf = tmp_path / "testbot.urdf"
+    urdf.write_text(URDF)
+    store = MotionStore(tmp_path / "motions")
+
+    solved = MotionSequence(num_frames=NUM_FRAMES, joint_names=JOINT_NAMES,
+                            body_names=["base", "arm"], fps=50)
+    store.write_reference_motion("clip", build_motion())
+    store.write_robot_motion("clip", solved, urdf, ["pelvis", "upper_arm"])
+
+    properties = read_properties(store.robot_file("clip", "testbot"))
+    pairs = dict(zip([str(v) for v in properties["reference_body_names"]],
+                     [str(v) for v in properties["body_names"]]))
+    assert pairs == {"pelvis": "base", "upper_arm": "arm"}
+
+
+def test_an_imported_log_pairs_each_body_with_itself(store):
+    """
+    An imported log is not retargeted, so its bodies are already the reference's own. The
+    pairing is written anyway, as the identity it is, so a reader never has to branch.
+    """
+    properties = read_properties(store.robot_file("clip", "testbot"))
+    assert [str(v) for v in properties["reference_body_names"]] == BODY_NAMES
+    assert [str(v) for v in properties["body_names"]] == BODY_NAMES
 
 
 def test_robot_layers_do_not_collide(tmp_path):
