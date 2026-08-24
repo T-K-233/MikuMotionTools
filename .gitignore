@@ -213,3 +213,6 @@ data/robots/
 *.rbl
 *.mp4
 renders/
+
+# Download metadata that `mikumotion pull` leaves in the motion store
+data/motions/.cache/

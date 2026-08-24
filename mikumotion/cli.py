@@ -5,9 +5,15 @@ The ``mikumotion`` command line: one entry point for working with motion files.
     mikumotion view <name>                            watch a motion in the Rerun viewer
     mikumotion retarget <name> <mjcf> <urdf> <map>    solve a robot's joints for a motion
     mikumotion list                                   show the motions in the store
+    mikumotion push <name> ...                        send motions to the remote dataset
+    mikumotion pull <name> ...                        fetch motions from the remote dataset
 
 You address a motion by name, not by path. The layout under ``--root`` decides which stage
 lands in which layer (see :mod:`mikumotion.motion_sequence`).
+
+``push`` and ``pull`` name motions the same way, and with no name they move the whole store.
+``MIKUMOTION_REMOTE`` says where (see :mod:`mikumotion.motion_remote`), so an environment is
+configured once instead of on every command.
 """
 
 import argparse
@@ -15,6 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .motion_remote import motion_layers, motion_paths, uri_to_remote
 from .motion_sequence import REFERENCE, MotionStore
 
 
@@ -23,7 +30,8 @@ def run_import(args):
 
     This command solves nothing, because the log already carries the joint angles a robot
     reached. Forward kinematics turns those angles into the poses, and both layers come from
-    the one sequence.
+    the one sequence: the export in ``reference/``, and the same poses as the robot layer's
+    goal, because a log reached its own goal.
     """
     from .forward_kinematics import robot_log_to_motion
 
@@ -55,11 +63,44 @@ def run_retarget(args):
 
 
 def run_list(args):
+    """Show the store, or the remote dataset with ``--remote``.
+
+    Both listings group the same way, by the layers a file name appears in, so a robot layer
+    on its own still counts as a motion — which is the point of the layer being
+    self-contained. The remote one stops there, because reading a frame count would mean
+    downloading the file this command exists to avoid downloading.
+    """
+    if args.remote:
+        for name, layers in motion_layers(uri_to_remote().paths()).items():
+            print(f"{name:30s} {', '.join(layers)}")
+        return
+
     store = MotionStore(args.root)
-    for path in sorted((store.root / REFERENCE).glob("*.rrd")):
-        motion = store.read_reference_motion(path.stem)
-        solved = store.robots(path.stem)
-        print(f"{path.stem:30s} {motion!r}  solved for: {', '.join(solved) or '-'}")
+    for name, layers in motion_layers(store.paths()).items():
+        robots = [layer for layer in layers if layer != REFERENCE]
+        motion = (store.read_reference_motion(name) if REFERENCE in layers
+                  else store.read_robot_motion(name, robots[0]))
+        print(f"{name:30s} {motion!r}  solved for: {', '.join(robots) or '-'}")
+
+
+def run_push(args):
+    """Upload the motions named, or the whole store, then print what moved."""
+    store = MotionStore(args.root)
+    remote = uri_to_remote()
+    paths = motion_paths(store.paths(), args.name)
+    remote.push(paths, store.root)
+    for path in paths:
+        print(path)
+
+
+def run_pull(args):
+    """Download the motions named, or the whole dataset, then print what moved."""
+    store = MotionStore(args.root)
+    remote = uri_to_remote()
+    paths = motion_paths(remote.paths(), args.name)
+    remote.pull(paths, store.root)
+    for path in paths:
+        print(path)
 
 
 def main():
@@ -88,7 +129,16 @@ def main():
     retarget.set_defaults(handler=run_retarget)
 
     listing = commands.add_parser("list", help="show the motions in the store")
+    listing.add_argument("--remote", action="store_true", help="list the remote dataset instead")
     listing.set_defaults(handler=run_list)
+
+    push = commands.add_parser("push", help="send motions to the remote dataset")
+    push.add_argument("name", nargs="*", help="motion names; none means the whole store")
+    push.set_defaults(handler=run_push)
+
+    pull = commands.add_parser("pull", help="fetch motions from the remote dataset")
+    pull.add_argument("name", nargs="*", help="motion names; none means the whole dataset")
+    pull.set_defaults(handler=run_pull)
 
     args = parser.parse_args()
     args.handler(args)

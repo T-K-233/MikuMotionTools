@@ -3,10 +3,11 @@ Everything that runs inside Blender: building armatures, reading a rig's animati
 motion, and playing a motion back on a rig.
 
 This module imports ``bpy``, so it only loads inside Blender. The entry points Blender runs
-live in ``scripts/blender/``.
+live in ``scripts/blender/``, one per conversion, named ``convert_<source>_to_<target>.py``.
 """
 
 import os
+import sys
 
 import numpy as np
 import bpy
@@ -15,13 +16,24 @@ from bpy.types import Object, PoseBone
 from mathutils import Matrix, Quaternion, Vector
 
 from .armature_tree import ArmatureTree
-from .motion_sequence import MotionSequence, fill_body_velocities
+from .motion_sequence import MotionSequence, MotionStore, fill_body_velocities
 from .urdf import RobotModel, rpy_to_quat
 
 
 C = bpy.context
 D = bpy.data
 O = bpy.ops
+
+
+def script_args():
+    """
+    The command-line arguments after ``--``, which Blender passes through untouched.
+
+    Blender parses ``sys.argv`` for its own flags first, so a script cannot read ``sys.argv``
+    directly. Every script in ``scripts/blender/`` starts here.
+    """
+    argv = sys.argv
+    return argv[argv.index("--") + 1:] if "--" in argv else []
 
 
 def set_scene_fps(fps: int) -> None:
@@ -173,7 +185,8 @@ def build_armature(tree: ArmatureTree, name="Armature", default_length=0.1):
         edit_bones.new(tree_root_name)
         tree_root = edit_bones.get(tree_root_name)
         tree_root.head = Vector(tree.local_translations[0])
-        tree_root.tail = Vector(tree.local_translations[0] + [default_length, 0, 0])  # root always points towards forward (+X axis)
+        # the root always points forward, along +X
+        tree_root.tail = Vector(tree.local_translations[0] + [default_length, 0, 0])
         tree_root.parent = all_root
 
     else:
@@ -433,6 +446,23 @@ def robot_model_to_armature(robot: RobotModel, name: str, with_meshes: bool) -> 
 # MOTION -> ARMATURE (drive the faithful rig from a MotionSequence)
 # ============================================================
 
+def first_driven_ancestor(bone, drive_names):
+    """
+    Return the driven ancestor a bone hangs off, if that ancestor is not its own parent.
+
+    Nothing to report when the parent itself is driven, or when no ancestor is: an undriven
+    chain all the way to the root leaves the bone where its rest pose puts it.
+    """
+    parent = bone.parent
+    if parent is None or parent.name in drive_names:
+        return None
+    while parent is not None:
+        if parent.name in drive_names:
+            return parent.name
+        parent = parent.parent
+    return None
+
+
 def motion_to_armature(
     motion: MotionSequence,
     armature: Object,
@@ -475,6 +505,15 @@ def motion_to_armature(
     missing = [n for n in motion.body_names if n not in data_bones]
     if missing:
         print(f"[motion] WARNING: {len(missing)} motion bodies have no matching bone (skipped): {missing[:6]}")
+
+    # A bone's basis below assumes its parent moved by the parent's own delta, so a bone whose
+    # nearest driven ancestor is not its parent lands offset by everything in between. Driving
+    # every bone of a chain is what makes the result exact; a sparse motion cannot be.
+    dragged = [n for n in drive_names if first_driven_ancestor(data_bones[n], drive_names)]
+    if dragged:
+        print(f"[motion] WARNING: {len(dragged)} bones have an undriven parent below a driven "
+              f"ancestor, so they carry that ancestor's motion twice: {dragged[:6]}. This "
+              f"motion covers {len(drive_names)} of {len(data_bones)} bones.")
 
     # cache per-bone rest matrix (armature space) + parent bone name; force quaternion mode
     rest_bone: "dict[str, Matrix]" = {}
@@ -525,6 +564,30 @@ def motion_to_armature(
     print(f"[motion] keyframed {motion.num_frames} frames onto '{armature.name}' "
           f"({len(drive_names)} bones) at {motion.fps}fps")
     return motion.num_frames
+
+
+def motion_to_robot_armature(motion_name, urdf_path, with_meshes):
+    """
+    Read a stored motion and build the robot's armature already keyed to it.
+
+    Both ``convert_motion_to_*`` scripts start here. The URDF's own ``name`` selects the layer
+    to read, because a robot's own layer is the only one that names that robot's links.
+
+    The poses it plays are that layer's goal. For an imported log the goal is the log's own
+    forward kinematics, so every link is keyed. For a retargeted motion only the links the
+    solve tracked carry a goal, and the rest of the armature stays at rest.
+
+    Returns the motion and the armature: the motion for a camera to follow, the armature for a
+    retarget to read. ``with_meshes`` is False when the rig is only a carrier for the poses, as
+    it is when a character is the thing being rendered.
+    """
+    robot = RobotModel.from_file(urdf_path)
+    motion = MotionStore().read_robot_motion(motion_name, robot.name)
+    print(f"{motion_name}: {motion!r}")
+
+    armature = robot_model_to_armature(robot, name=robot.name, with_meshes=with_meshes)
+    motion_to_armature(motion, armature, robot.to_armature_tree())
+    return motion, armature
 
 
 # ============================================================

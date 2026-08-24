@@ -17,6 +17,7 @@ MAX_ITER = 40
 KNEE_BIAS = 0.2    # rad, keeps knees off the straight-leg singularity
 ELBOW_BIAS = -0.2
 BASE_COORDS = 7    # a floating base occupies the first 7 qpos entries
+ROOT_BODY_ID = 1   # MuJoCo body 0 is the world, so the robot's root link is body 1
 
 
 class MotionRetargetingIK:
@@ -50,10 +51,11 @@ class MotionRetargetingIK:
         # source body -> target robot link, in a stable order
         self.retargeted_bodies = {source: target for source, (target, _) in mapping.items()}
 
-        # draw where each body currently is and where it is being pulled to
+        # draw where each tracked link currently is and where it is being pulled to
+        links = list(self.retargeted_bodies.values())
         xml = Path(robot_xml).read_text()
-        xml = add_body_frames(xml, self.retargeted_bodies, prefix="current_", center_color=(0.0, 1.0, 1.0))
-        xml = add_body_frames(xml, self.retargeted_bodies, prefix="target_", center_color=(1.0, 0.0, 1.0))
+        xml = add_body_frames(xml, links, prefix="current_", center_color=(0.0, 1.0, 1.0))
+        xml = add_body_frames(xml, links, prefix="target_", center_color=(1.0, 0.0, 1.0))
         framed_xml = Path(robot_xml).with_name(Path(robot_xml).stem + "_frames.xml")
         framed_xml.write_text(xml)
 
@@ -65,14 +67,43 @@ class MotionRetargetingIK:
         joint_names = [self.model.joint(j).name for j in range(self.model.njnt)
                        if self.model.jnt_type[j] != mujoco.mjtJoint.mjJNT_FREE]
 
+        # What the solve reached. Only the root link's pose is stored, as the placement that
+        # puts the robot in the world, so only the root link is kept: every other reached pose
+        # is the forward kinematics of the joints beside it.
         self.target_motion = MotionSequence(
             num_frames=self.num_frames,
             joint_names=joint_names,
-            body_names=list(self.retargeted_bodies.values()),
+            body_names=[self.model.body(ROOT_BODY_ID).name],
             fps=self.fps,
         )
 
         self.orientation_offsets = self.rest_offsets()
+
+        # Where the IK is aimed, under the robot's own link names and in their frame
+        # convention: the pose the robot cannot reach, which survives nowhere else and is what
+        # a tracking reward compares the robot against. It does not depend on the solve, so it
+        # is built once, here, and the frame loop only reads rows out of it.
+        sources = self.source_motion.get_body_indices(self.retargeted_bodies)
+        offsets = np.stack([self.orientation_offsets[body] for body in self.retargeted_bodies])
+        positions = self.source_motion.body_positions[:, sources].astype(np.float64)
+        rotations = quat_mul(self.source_motion.body_rotations[:, sources], offsets)  # float64
+
+        self.goal_motion = MotionSequence(
+            num_frames=self.num_frames,
+            joint_names=[],  # a goal is a body pose; the joints beside it are what was reached
+            body_names=list(self.retargeted_bodies.values()),
+            fps=self.fps,
+        )
+        self.goal_motion.body_positions[:] = positions
+        self.goal_motion.body_rotations[:] = rotations
+        fill_body_velocities(self.goal_motion)
+
+        # The same goal as one (frames, bodies, 7) array, in the order mink's SE3 takes it.
+        # It stays float64: rounding to the stored float32 would move the target the IK sees.
+        self.targets = np.concatenate([rotations, positions], axis=-1)
+
+        # one mocap id per tracked link, looked up once: the frame loop runs 2000+ times
+        self.markers = {link: self.model.body(f"target_{link}_frame").mocapid[0] for link in links}
 
         self.tasks = []
         self.frame_tasks = {}
@@ -120,7 +151,7 @@ class MotionRetargetingIK:
         assert self.store.reference_file(reference).exists(), (
             f"retargeting needs the source rig's rest pose at {self.store.reference_file(reference)}, "
             f"to measure how far each bone's frame sits from the link it drives. "
-            f"scripts/blender/export_mocap.py writes it beside the animation."
+            f"scripts/blender/convert_mocap_to_motion.py writes it beside the animation."
         )
         rest = self.store.read_reference_motion(reference)
         zero = mujoco.MjData(self.model)
@@ -147,6 +178,18 @@ class MotionRetargetingIK:
             root.add_freejoint()
         return spec.compile()
 
+    def show_targets(self, targets) -> None:
+        """
+        Move the viewer's marker pairs: where each tracked link is, where it is pulled to.
+
+        Only worth doing when a window is open, so ``run`` calls this under its viewer check.
+        The markers are named after the robot's links, which is what they follow.
+        """
+        for (link, mocap_id), target in zip(self.markers.items(), targets):
+            mink.move_mocap_to_frame(self.model, self.data, f"current_{link}_frame", link, "body")
+            self.data.mocap_pos[mocap_id] = target[4:]
+            self.data.mocap_quat[mocap_id] = target[:4]
+
     def calculate_error(self) -> float:
         """Return the combined error of every task."""
         return np.linalg.norm(
@@ -171,7 +214,8 @@ class MotionRetargetingIK:
 
     def run(self, show_viewer: bool = False):
         """
-        Solve every frame and write the result as ``<robot>/<motion>``.
+        Solve every frame and write the result as ``<robot>/<motion>``: the joints the solve
+        reached, and the goal it was aimed at.
 
         With ``show_viewer``, a passive MuJoCo window follows the solve at playback speed.
         Without it, the solve runs headless as fast as it can.
@@ -184,26 +228,10 @@ class MotionRetargetingIK:
             rate = RateLimiter(frequency=self.fps / 4, warn=False)
 
         for frame_idx in tqdm(range(self.num_frames)):
-            for body_name, target_body_name in self.retargeted_bodies.items():
-                source_body_index = self.source_motion.get_body_indices([body_name])[0]
-
-                source_position = self.source_motion.body_positions[frame_idx, source_body_index].copy()
-
-                # carried onto the robot's own frame; see rest_offsets
-                source_orientation = quat_mul(
-                    self.source_motion.body_rotations[frame_idx, source_body_index],
-                    self.orientation_offsets[body_name],
-                )
-
-                self.frame_tasks[target_body_name].set_target(mink.SE3(
-                    wxyz_xyz=np.concatenate([source_orientation, source_position])
-                ))
-
-                # the viewer's two marker bodies: where the link is, where it is pulled to
-                mink.move_mocap_to_frame(self.model, self.data, f"current_{body_name}_frame", body_name, "body")
-                mocap_id = self.model.body(f"target_{body_name}_frame").mocapid[0]
-                self.data.mocap_pos[mocap_id] = source_position
-                self.data.mocap_quat[mocap_id] = source_orientation
+            for task, target in zip(self.frame_tasks.values(), self.targets[frame_idx]):
+                task.set_target(mink.SE3(wxyz_xyz=target))
+            if viewer is not None:
+                self.show_targets(self.targets[frame_idx])
 
             prev_error = self.calculate_error()
             num_iter = 0
@@ -220,25 +248,20 @@ class MotionRetargetingIK:
             mujoco.mj_forward(self.model, self.data)
             self.target_motion.joint_positions[frame_idx, :] = self.data.qpos[BASE_COORDS:]
 
-            # Poses only. IK integrates qpos and leaves qvel at zero, so mj_objectVelocity
-            # would report every body as motionless; velocities are differenced at the end.
-            for i, target_body_name in enumerate(self.retargeted_bodies.values()):
-                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, target_body_name)
-                self.target_motion.body_positions[frame_idx, i, :] = self.data.xpos[body_id]
-                self.target_motion.body_rotations[frame_idx, i, :] = self.data.xquat[body_id]
+            # The pose, not the velocity: IK integrates qpos and leaves qvel at zero, so
+            # mj_objectVelocity would report the base as motionless.
+            self.target_motion.body_positions[frame_idx, 0, :] = self.data.xpos[ROOT_BODY_ID]
+            self.target_motion.body_rotations[frame_idx, 0, :] = self.data.xquat[ROOT_BODY_ID]
 
             if viewer is not None:
                 viewer.sync()
                 rate.sleep()
 
         self.target_motion.joint_velocities[1:] = np.diff(self.target_motion.joint_positions, axis=0) * self.fps
-        fill_body_velocities(self.target_motion)
 
         if viewer is not None:
             viewer.close()
 
-        # the solve pairs two rigs that do not share a vocabulary, so the file records which
-        # reference body each robot link was solved from
         path = self.store.write_robot_motion(self.motion_name, self.target_motion,
-                                             self.urdf_path, list(self.retargeted_bodies))
+                                             self.urdf_path, self.goal_motion)
         print(f"Results saved to {path}")

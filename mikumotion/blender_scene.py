@@ -5,6 +5,10 @@ follows the motion, and a video render.
 Blender is often built without FFmpeg, and the build bundled here is one of those. Its RNA
 enum still lists ``FFMPEG``, so no flag tells you whether the encoder is there. This module
 therefore always renders a PNG sequence and hands it to an external encoder.
+
+``MIKUMOTION_FFMPEG`` names that encoder when it is not simply ``ffmpeg`` on the path. It is a
+property of the machine, not of a render, so it is an environment variable rather than a flag
+on every script.
 """
 
 import os
@@ -13,6 +17,7 @@ import subprocess
 import bpy
 from mathutils import Vector
 
+FFMPEG = os.environ.get("MIKUMOTION_FFMPEG", "ffmpeg")
 RESOLUTION = (720, 900)
 CAMERA_OFFSET = (2.6, -5.4, 1.3)
 CAMERA_LOOK_HEIGHT = 0.5  # aim low enough that crouching and prone poses stay framed
@@ -90,7 +95,21 @@ def configure_render(shading):
     return scene
 
 
-def render_animation(out_video, ffmpeg):
+def dress_scene(motion, shading):
+    """
+    Add the ground, the light and a camera that follows the motion, then set up the renderer.
+
+    Both ``convert_motion_to_*`` scripts want the same scene and differ only in shading:
+    MATERIAL for a robot's flat link colours, TEXTURE for a character's skin. Frame 1 is where
+    ``motion_to_armature`` puts the motion's first frame.
+    """
+    add_ground()
+    add_lighting()
+    follow_camera(motion, frame_start=1)
+    configure_render(shading)
+
+
+def render_animation(out_video):
     """Render the scene's frame range to ``out_video`` through a PNG sequence."""
     scene = bpy.context.scene
     frames_dir = os.path.join(os.path.dirname(os.path.abspath(out_video)), "_frames")
@@ -102,7 +121,7 @@ def render_animation(out_video, ffmpeg):
     bpy.ops.render.render(animation=True)
 
     command = [
-        ffmpeg, "-y", "-framerate", str(scene.render.fps),
+        FFMPEG, "-y", "-framerate", str(scene.render.fps),
         "-start_number", "1", "-i", os.path.join(frames_dir, "f_%04d.png"),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", out_video,
     ]
