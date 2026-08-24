@@ -69,23 +69,6 @@ storage keeps one copy of the robot geometry that every robot layer repeats. An 
 `s3://<bucket>/<prefix>`, is the same three methods over `boto3`. See
 [the dataset remote](https://t-k-233.github.io/MikuMotionTools/#the-dataset-remote).
 
-## Documentation
-
-**[t-k-233.github.io/MikuMotionTools](https://t-k-233.github.io/MikuMotionTools/)** covers the
-install, every command, both walkthroughs, the motion format, the conventions, and the theory
-behind each direction. The source is in [`docs/`](./docs/).
-
-## Layout
-
-```
-mikumotion/        the library
-scripts/blender/   the scripts Blender runs
-docs/              the documentation site
-data/motions/      converted motions
-data/robots/       robot assets for the FK and the IK
-blender-projects/  Blender project files
-```
-
 ## License
 
 MIT. See [LICENSE](./LICENSE).
