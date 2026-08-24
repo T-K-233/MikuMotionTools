@@ -26,24 +26,14 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from .math import quat_mul
 
-def _parse_vec(text: Optional[str], default: Tuple[float, ...]) -> np.ndarray:
+
+def parse_vec(text: Optional[str], default: Tuple[float, ...]) -> np.ndarray:
     """Parse a whitespace-separated float vector, falling back to ``default``."""
     if text is None or text.strip() == "":
         return np.array(default, dtype=np.float32)
     return np.fromstring(text, dtype=np.float32, sep=" ")
-
-
-def _quat_mul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Return the Hamilton product of two ``(w, x, y, z)`` quaternions."""
-    aw, ax, ay, az = a
-    bw, bx, by, bz = b
-    return np.array([
-        aw * bw - ax * bx - ay * by - az * bz,
-        aw * bx + ax * bw + ay * bz - az * by,
-        aw * by - ax * bz + ay * bw + az * bx,
-        aw * bz + ax * by - ay * bx + az * bw,
-    ], dtype=np.float64)
 
 
 def rpy_to_quat(rpy: np.ndarray) -> np.ndarray:
@@ -59,7 +49,7 @@ def rpy_to_quat(rpy: np.ndarray) -> np.ndarray:
     qx = np.array([np.cos(roll / 2), np.sin(roll / 2), 0.0, 0.0])
     qy = np.array([np.cos(pitch / 2), 0.0, np.sin(pitch / 2), 0.0])
     qz = np.array([np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)])
-    return _quat_mul(qz, _quat_mul(qy, qx)).astype(np.float32)
+    return quat_mul(qz, quat_mul(qy, qx)).astype(np.float32)
 
 
 @dataclass
@@ -207,7 +197,7 @@ class RobotModel:
         for mat in root.findall("material"):
             color = mat.find("color")
             if color is not None:
-                global_materials[mat.attrib["name"]] = _parse_vec(color.attrib.get("rgba"), (0.8, 0.8, 0.8, 1.0))
+                global_materials[mat.attrib["name"]] = parse_vec(color.attrib.get("rgba"), (0.8, 0.8, 0.8, 1.0))
 
         links: Dict[str, Link] = {}
         for xml_link in root.findall("link"):
@@ -215,7 +205,7 @@ class RobotModel:
             link = Link(name=link_name)
 
             for xml_visual in xml_link.findall("visual"):
-                visual = cls._parse_visual(xml_visual, urdf_dir, mesh_package_roots, global_materials)
+                visual = cls.parse_visual(xml_visual, urdf_dir, mesh_package_roots, global_materials)
                 link.visuals.append(visual)
 
             links[link_name] = link
@@ -229,30 +219,30 @@ class RobotModel:
                 type=xml_joint.attrib.get("type", "fixed"),
                 parent=xml_joint.find("parent").attrib["link"],
                 child=xml_joint.find("child").attrib["link"],
-                origin_xyz=_parse_vec(origin.attrib.get("xyz") if origin is not None else None, (0, 0, 0)),
-                origin_rpy=_parse_vec(origin.attrib.get("rpy") if origin is not None else None, (0, 0, 0)),
-                axis=_parse_vec(axis.attrib.get("xyz") if axis is not None else None, (1, 0, 0)),
+                origin_xyz=parse_vec(origin.attrib.get("xyz") if origin is not None else None, (0, 0, 0)),
+                origin_rpy=parse_vec(origin.attrib.get("rpy") if origin is not None else None, (0, 0, 0)),
+                axis=parse_vec(axis.attrib.get("xyz") if axis is not None else None, (1, 0, 0)),
             ))
 
         return cls(name=name, links=links, joints=joints)
 
     @staticmethod
-    def _parse_visual(
+    def parse_visual(
         xml_visual: ET.Element,
         urdf_dir: str,
         mesh_package_roots: Optional[Dict[str, str]],
         global_materials: Dict[str, np.ndarray],
     ) -> Visual:
         origin = xml_visual.find("origin")
-        origin_xyz = _parse_vec(origin.attrib.get("xyz") if origin is not None else None, (0, 0, 0))
-        origin_rpy = _parse_vec(origin.attrib.get("rpy") if origin is not None else None, (0, 0, 0))
+        origin_xyz = parse_vec(origin.attrib.get("xyz") if origin is not None else None, (0, 0, 0))
+        origin_rpy = parse_vec(origin.attrib.get("rpy") if origin is not None else None, (0, 0, 0))
 
         mesh_path: Optional[str] = None
         scale = np.ones(3, dtype=np.float32)
         mesh = xml_visual.find("geometry/mesh")
         if mesh is not None:
-            mesh_path = _resolve_mesh_path(mesh.attrib.get("filename", ""), urdf_dir, mesh_package_roots)
-            scale = _parse_vec(mesh.attrib.get("scale"), (1, 1, 1))
+            mesh_path = resolve_mesh_path(mesh.attrib.get("filename", ""), urdf_dir, mesh_package_roots)
+            scale = parse_vec(mesh.attrib.get("scale"), (1, 1, 1))
 
         rgba: Optional[np.ndarray] = None
         material_name: Optional[str] = None
@@ -261,7 +251,7 @@ class RobotModel:
             material_name = material.attrib.get("name")
             color = material.find("color")
             if color is not None:
-                rgba = _parse_vec(color.attrib.get("rgba"), (0.8, 0.8, 0.8, 1.0))
+                rgba = parse_vec(color.attrib.get("rgba"), (0.8, 0.8, 0.8, 1.0))
             elif material_name in global_materials:
                 rgba = global_materials[material_name]
 
@@ -275,7 +265,7 @@ class RobotModel:
         )
 
 
-def _resolve_mesh_path(
+def resolve_mesh_path(
     filename: str,
     urdf_dir: str,
     mesh_package_roots: Optional[Dict[str, str]],

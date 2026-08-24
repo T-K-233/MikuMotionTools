@@ -32,9 +32,16 @@ examples = [
 dev = [
     "pytest",
 ]
+hf = [
+    "huggingface-hub",
+]
+s3 = [
+    "boto3",
+]
 all = [
     "mikumotion[examples]",
     "mikumotion[dev]",
+    "mikumotion[hf]",
 ]
 
 [project.scripts]

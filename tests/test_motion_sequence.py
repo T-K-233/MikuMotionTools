@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mikumotion.motion_sequence import (REFERENCE, MotionSequence, MotionStore, body_frame,
+from mikumotion.motion_sequence import (REFERENCE, MotionSequence, MotionStore, pose_group,
                                         fill_body_velocities, quat_to_wxyz, quat_to_xyzw,
                                         read_blueprint_overrides, read_entity_columns, read_properties,
                                         read_entity_components)
@@ -50,10 +50,16 @@ def build_motion():
 
 
 @pytest.fixture
-def store(tmp_path):
+def urdf(tmp_path):
+    """The robot every test solves for: two links, one joint."""
+    path = tmp_path / "testbot.urdf"
+    path.write_text(URDF)
+    return path
+
+
+@pytest.fixture
+def store(tmp_path, urdf):
     """A motion at both stages: exported to reference/, then solved for testbot."""
-    urdf = tmp_path / "testbot.urdf"
-    urdf.write_text(URDF)
     written = MotionStore(tmp_path / "motions")
     motion = build_motion()
     written.write_reference_motion("clip", motion)
@@ -84,7 +90,7 @@ def test_motion_round_trips_without_a_robot_model(tmp_path):
 
 
 def test_repeated_body_names_are_rejected(tmp_path):
-    """Bodies are stored at /<layer>/body/poses/<name>, so two sharing a name collide."""
+    """Bodies are stored at /<group>/poses/<name>, so two sharing a name collide."""
     store = MotionStore(tmp_path / "motions")
     motion = MotionSequence(num_frames=2, joint_names=[], body_names=["torso", "torso"])
     with pytest.raises(AssertionError, match="body names must be unique"):
@@ -145,7 +151,7 @@ def test_quaternion_order_is_involutive():
 
 
 def test_metadata_round_trips(store):
-    motion = store.read_reference_motion("clip", "testbot")
+    motion = store.read_robot_motion("clip", "testbot")
     assert motion.joint_names == JOINT_NAMES
     assert motion.body_names == BODY_NAMES
     assert motion.num_frames == NUM_FRAMES
@@ -177,61 +183,71 @@ def test_a_robot_layer_holds_everything_under_its_own_name(store):
     assert not stray, stray
 
 
-def test_a_robot_layer_stores_the_poses_the_solve_reached(store):
+def test_a_robot_layer_stores_the_goal_and_not_the_pose_it_reached(store):
     """
-    The reference poses are what the solve aimed at; the robot layer keeps what it reached.
-    Both are stored, because the difference between them is the retarget's error.
+    The reached pose is the forward kinematics of the joints in the same file, so the layer
+    keeps the goal instead: the pose the solve aimed at, which nothing else records.
     """
-    entities = set(read_entity_columns(store.robot_file("clip", "testbot")))
-    assert entities >= {"/testbot/joint/positions", "/testbot/joint/velocities",
-                        "/testbot/body/poses/base", "/testbot/body/poses/arm",
-                        "/testbot/body/linear_velocities", "/testbot/body/angular_velocities"}
+    columns = read_entity_columns(store.robot_file("clip", "testbot"))
+    assert set(columns) >= {"/testbot/joint/positions", "/testbot/joint/velocities",
+                            "/testbot/goal/poses/base", "/testbot/goal/poses/arm",
+                            "/testbot/goal/linear_velocities", "/testbot/goal/angular_velocities"}
+
+    # no per-frame pose of the robot's own, in any of the forms it used to be stored in
+    assert not [path for path in columns if path.startswith("/testbot/body/")], set(columns)
+
+    # The gizmos on the robot's own link frames stay. They ride the joint chain, so they draw
+    # where the solve got to, and being static they cost no row per frame.
+    statics = set(read_entity_components(store.robot_file("clip", "testbot")))
+    assert {"/testbot/body/frames/base", "/testbot/body/frames/arm"} <= statics
+    assert {"/testbot/goal/frames/base", "/testbot/goal/frames/arm"} <= statics
 
     expected = build_motion()
-    poses = read_entity_columns(store.robot_file("clip", "testbot"))
     for index, body in enumerate(BODY_NAMES):
-        column = poses[f"/testbot/body/poses/{body}"]
+        column = columns[f"/testbot/goal/poses/{body}"]
         np.testing.assert_allclose(column["translation"].reshape(-1, 3),
                                    expected.body_positions[:, index], rtol=0, atol=1e-6)
 
 
-def test_the_reader_returns_reference_poses_with_robot_joints(store):
+def test_a_robot_layer_reads_back_out_of_its_own_file(store):
     """
-    Both layers now hold body poses, so which one a read returns has to be unambiguous: a
-    training run tracks the reference, and reads the robot's own poses from the robot layer.
+    A training run reads one file. The joints and the goal it tracks both come out of the
+    robot layer, and the reference layer is not touched.
     """
-    whole = store.read_reference_motion("clip", "testbot")
-    assert whole.body_names == BODY_NAMES and whole.joint_names == JOINT_NAMES
+    store.reference_file("clip").unlink()
 
-    reference = read_entity_columns(store.reference_file("clip"))
+    motion = store.read_robot_motion("clip", "testbot")
+    assert motion.body_names == BODY_NAMES and motion.joint_names == JOINT_NAMES
+
+    goal = read_entity_columns(store.robot_file("clip", "testbot"))
     np.testing.assert_allclose(
-        whole.body_positions[:, 0],
-        reference["/reference/body/poses/base"]["translation"].reshape(-1, 3),
+        motion.body_positions[:, 0],
+        goal["/testbot/goal/poses/base"]["translation"].reshape(-1, 3),
         rtol=0, atol=1e-6)
 
 
-def test_reference_and_robot_frames_never_share_a_name(store):
+def test_a_goal_and_a_link_never_share_a_frame_name():
     """
-    A coordinate frame can have one parent. The robot's link frames come from its joint
-    chain, so its body poses name ``<robot>/body/<link>`` and the reference names
-    ``reference/body/<name>``: three namespaces that cannot collide.
+    A coordinate frame can have one parent. A robot's link frames come from its joint chain,
+    so its poses go under ``<robot>/goal`` and the reference's under ``reference/body``: three
+    namespaces that cannot collide. One function decides it for writer, reader and blueprint.
     """
-    assert body_frame(REFERENCE, "base") == "reference/body/base"
-    assert body_frame("testbot", "base") == "testbot/body/base"
-    assert body_frame(REFERENCE, "base") != body_frame("testbot", "base") != "testbot/base"
+    assert pose_group(REFERENCE) == "reference/body"
+    assert pose_group("testbot") == "testbot/goal"  # never "testbot", which the joint chain owns
 
 
-@pytest.mark.parametrize("layer", ["reference", "testbot"])
+@pytest.mark.parametrize("layer", [REFERENCE, "testbot"])
 def test_velocity_arrows_name_the_frame_they_are_measured_in(store, layer):
     """
     An entity that names no frame is an orphan. The viewer invents one called
     ``tf#<entity path>``, cannot route it to the view's root, and draws nothing but an
     error — which is what a robot layer opened on its own used to show.
     """
-    path = store.reference_file("clip") if layer == "reference" else         store.robot_file("clip", "testbot")
+    path = (store.reference_file("clip") if layer == REFERENCE
+            else store.robot_file("clip", layer))
     components = read_entity_components(path)
     for quantity in ("linear", "angular"):
-        entity = f"/{layer}/body/{quantity}_velocities"
+        entity = f"/{pose_group(layer)}/{quantity}_velocities"
         assert "CoordinateFrame:frame" in components[entity], components[entity]
 
 
@@ -258,10 +274,10 @@ def test_the_blueprint_hides_entities_instead_of_excluding_them(store):
     """
     hidden = read_blueprint_overrides(store.robot_file("clip", "testbot"))
     assert "/testbot/body/frames" in hidden
-    assert {"/testbot/body/linear_velocities", "/reference/body/linear_velocities"} <= hidden
+    assert {"/testbot/goal/linear_velocities", "/reference/body/linear_velocities"} <= hidden
 
-    # the reference gizmos are what the IK aimed at, so they are the one thing left visible
-    assert not any(path.startswith("/reference/body/frames") for path in hidden), hidden
+    # the goal gizmos are what the IK aimed at, so they are the one thing left visible
+    assert not any(path.startswith("/testbot/goal/frames") for path in hidden), hidden
 
 
 def test_a_motion_opened_alone_hides_its_velocity_arrows(store):
@@ -270,55 +286,67 @@ def test_a_motion_opened_alone_hides_its_velocity_arrows(store):
         "/reference/body/linear_velocities", "/reference/body/angular_velocities"}
 
 
-def test_a_retarget_records_which_reference_body_drove_each_link(tmp_path):
+def test_a_retarget_stores_its_goal_under_the_robots_own_link_names(tmp_path, urdf):
     """
-    A retarget pairs two rigs that do not share a vocabulary: the reference calls a body
-    ``torso`` where the robot calls its link ``chest``. Without the pairing in the file, a
-    reader has to know which retarget map produced it.
+    A retarget pairs two rigs that do not share a vocabulary: the source rig calls a body
+    ``spine1`` where the robot calls its link ``chest``. The goal is written under the
+    robot's names, so the file needs no map back to the source rig, and records none.
     """
-    urdf = tmp_path / "testbot.urdf"
-    urdf.write_text(URDF)
     store = MotionStore(tmp_path / "motions")
 
     solved = MotionSequence(num_frames=NUM_FRAMES, joint_names=JOINT_NAMES,
-                            body_names=["base", "arm"], fps=50)
-    store.write_reference_motion("clip", build_motion())
-    store.write_robot_motion("clip", solved, urdf, ["pelvis", "upper_arm"])
+                            body_names=BODY_NAMES, fps=50)
+    goal = MotionSequence(num_frames=NUM_FRAMES, joint_names=[], body_names=BODY_NAMES, fps=50)
+    goal.body_positions[:] = np.arange(NUM_FRAMES * 6, dtype=np.float32).reshape(NUM_FRAMES, 2, 3)
+    store.write_robot_motion("clip", solved, urdf, goal)
 
     properties = read_properties(store.robot_file("clip", "testbot"))
-    pairs = dict(zip([str(v) for v in properties["reference_body_names"]],
-                     [str(v) for v in properties["body_names"]]))
-    assert pairs == {"pelvis": "base", "upper_arm": "arm"}
+    assert [str(v) for v in properties["body_names"]] == BODY_NAMES
+    assert "reference_body_names" not in properties, properties
+
+    stored = store.read_robot_motion("clip", "testbot")
+    np.testing.assert_allclose(stored.body_positions, goal.body_positions, rtol=0, atol=1e-6)
 
 
-def test_an_imported_log_pairs_each_body_with_itself(store):
+def test_a_goal_must_be_sampled_with_the_motion(tmp_path, urdf):
+    """Both go on one frame timeline, so a shorter goal would land on the wrong frames."""
+    store = MotionStore(tmp_path / "motions")
+
+    short = MotionSequence(num_frames=3, joint_names=[], body_names=BODY_NAMES, fps=50)
+    with pytest.raises(AssertionError, match="sampled with the motion"):
+        store.write_robot_motion("clip", build_motion(), urdf, short)
+
+
+def test_an_imported_log_is_its_own_goal(store):
     """
-    An imported log is not retargeted, so its bodies are already the reference's own. The
-    pairing is written anyway, as the identity it is, so a reader never has to branch.
+    An imported log is not retargeted: it reached the pose it was logged at. The goal
+    therefore defaults to the motion itself, so a reader never has to branch.
     """
     properties = read_properties(store.robot_file("clip", "testbot"))
-    assert [str(v) for v in properties["reference_body_names"]] == BODY_NAMES
     assert [str(v) for v in properties["body_names"]] == BODY_NAMES
 
+    logged = store.read_robot_motion("clip", "testbot")
+    np.testing.assert_allclose(logged.body_positions, build_motion().body_positions,
+                               rtol=0, atol=1e-6)
 
-def test_robot_layers_do_not_collide(tmp_path):
+
+def test_robot_layers_do_not_collide(tmp_path, urdf):
     """Two robots solved from one motion must not overwrite each other's entities."""
-    first, second = tmp_path / "testbot.urdf", tmp_path / "otherbot.urdf"
-    first.write_text(URDF)
+    second = tmp_path / "otherbot.urdf"
     second.write_text(URDF.replace('robot name="testbot"', 'robot name="otherbot"'))
 
     store = MotionStore(tmp_path / "motions")
     motion = build_motion()
     store.write_reference_motion("clip", motion)
-    store.write_robot_motion("clip", motion, first)
+    store.write_robot_motion("clip", motion, urdf)
     doubled = motion.copy()
     doubled.joint_positions *= 2.0
     store.write_robot_motion("clip", doubled, second)
 
     assert store.robots("clip") == ["otherbot", "testbot"]
-    np.testing.assert_allclose(store.read_reference_motion("clip", "testbot").joint_positions,
+    np.testing.assert_allclose(store.read_robot_motion("clip", "testbot").joint_positions,
                                motion.joint_positions, rtol=0, atol=1e-6)
-    np.testing.assert_allclose(store.read_reference_motion("clip", "otherbot").joint_positions,
+    np.testing.assert_allclose(store.read_robot_motion("clip", "otherbot").joint_positions,
                                doubled.joint_positions, rtol=0, atol=1e-6)
 
 
@@ -332,7 +360,7 @@ def test_robot_layers_do_not_collide(tmp_path):
 ])
 def test_array_round_trips(store, field):
     expected = getattr(build_motion(), field)
-    actual = getattr(store.read_reference_motion("clip", "testbot"), field)
+    actual = getattr(store.read_robot_motion("clip", "testbot"), field)
     assert actual.shape == expected.shape
     np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-6)
 

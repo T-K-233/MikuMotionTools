@@ -1,0 +1,1691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MikuMotionTools</title>
+<meta name="description" content="Motion conversion between character animation and humanoid robot reinforcement learning.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='14'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E">
+<style>
+/* ---------------------------------------------------------------- tokens */
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f6f7f9;
+  --fg: #1f2328;
+  --muted: #656d76;
+  --border: #d8dee4;
+  --accent: #2f5fd0;
+  --accent-soft: #eaf0fc;
+  --code-bg: #f5f6f8;
+  --code-fg: #1f2328;
+  --note: #2f5fd0;
+  --warning: #cf222e;
+  --caution: #9a6700;
+
+  --fig-red: #d64545;
+  --fig-green: #2f9e44;
+  --fig-blue: #3b5bdb;
+  --fig-blue-ink: #1c3faa;
+  --fig-blue-bg: #e8eefc;
+  --fig-gray: #8a8f98;
+
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --topbar-h: 3.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --bg-soft: #151821;
+    --fg: #dee3ea;
+    --muted: #98a1af;
+    --border: #2a3040;
+    --accent: #7fa5f5;
+    --accent-soft: #17203a;
+    --code-bg: #161a22;
+    --code-fg: #dee3ea;
+    --note: #7fa5f5;
+    --warning: #f47c7c;
+    --caution: #d9a441;
+
+    --fig-red: #ef7676;
+    --fig-green: #58c46f;
+    --fig-blue: #7fa5f5;
+    --fig-blue-ink: #0f2456;
+    --fig-blue-bg: #dbe5fb;
+    --fig-gray: #9aa2ae;
+  }
+}
+
+/* ---------------------------------------------------------------- base */
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--topbar-h) + 0.75rem); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--topbar-h);
+  padding: 0 1.25rem;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { font-weight: 650; color: var(--fg); letter-spacing: -0.01em; }
+.brand:hover { text-decoration: none; }
+.topnav a { font-size: 0.9rem; }
+
+/* ---------------------------------------------------------------- layout */
+.layout {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  gap: 3rem;
+  max-width: 74rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.sidebar { position: relative; }
+.toc {
+  position: sticky;
+  top: calc(var(--topbar-h) + 1.5rem);
+  max-height: calc(100vh - var(--topbar-h) - 3rem);
+  overflow-y: auto;
+  padding: 1.5rem 0 2rem;
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+.toc-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.toc-list { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--border); }
+.toc-list li { margin: 0; }
+.toc-list a {
+  display: block;
+  padding: 0.2rem 0.7rem;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  color: var(--muted);
+}
+.toc-list a:hover { color: var(--fg); text-decoration: none; }
+.toc-list a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+.toc-list .lvl3 a { padding-left: 1.5rem; font-size: 0.8rem; }
+
+.toc-mobile { display: none; }
+
+main { min-width: 0; padding: 2rem 0 4rem; max-width: 46rem; }
+
+/* ---------------------------------------------------------------- headings */
+h1, h2, h3, h4 { line-height: 1.3; letter-spacing: -0.015em; scroll-margin-top: calc(var(--topbar-h) + 1rem); }
+h1 { font-size: 2.1rem; margin: 0 0 1.25rem; font-weight: 700; }
+h2 {
+  font-size: 1.45rem;
+  margin: 3rem 0 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 650;
+}
+h3 { font-size: 1.12rem; margin: 2.25rem 0 0.75rem; font-weight: 650; }
+h4 { font-size: 0.98rem; margin: 1.75rem 0 0.5rem; font-weight: 650; color: var(--fg); }
+
+.anchor {
+  margin-left: 0.4rem;
+  color: var(--border);
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+.anchor:hover { color: var(--accent); text-decoration: none; }
+
+p { margin: 1rem 0; }
+hr { height: 0; margin: 3rem 0 0; border: 0; border-top: 1px solid transparent; }
+
+ul, ol { margin: 1rem 0; padding-left: 1.5rem; }
+li { margin: 0.35rem 0; }
+
+strong { font-weight: 650; }
+
+/* ---------------------------------------------------------------- code */
+code {
+  font-family: var(--mono);
+  font-size: 0.855em;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  word-break: break-word;
+}
+pre {
+  position: relative;
+  margin: 1.1rem 0;
+  padding: 0.9rem 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+pre code {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.83rem;
+  line-height: 1.6;
+  white-space: pre;
+}
+.copy {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+pre:hover .copy, .copy:focus-visible { opacity: 1; }
+.copy:hover { color: var(--fg); }
+
+/* ---------------------------------------------------------------- tables */
+.table-wrap { margin: 1.25rem 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+th, td { padding: 0.55rem 0.8rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+thead th { background: var(--bg-soft); font-weight: 650; white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { font-size: 0.82em; }
+
+/* ---------------------------------------------------------------- callouts */
+.callout {
+  margin: 1.25rem 0;
+  padding: 0.1rem 1rem;
+  background: var(--bg-soft);
+  border-left: 3px solid var(--muted);
+  border-radius: 0 5px 5px 0;
+}
+.callout p { margin: 0.8rem 0; }
+.callout-label { font-weight: 650; }
+.callout.note { border-left-color: var(--note); }
+.callout.note .callout-label { color: var(--note); }
+.callout.warning { border-left-color: var(--warning); }
+.callout.warning .callout-label { color: var(--warning); }
+.callout.caution { border-left-color: var(--caution); }
+.callout.caution .callout-label { color: var(--caution); }
+
+/* ---------------------------------------------------------------- figures */
+figure { margin: 1.75rem 0; text-align: center; }
+figure svg { width: 100%; height: auto; max-width: 42rem; }
+figcaption {
+  margin: 0.6rem auto 0;
+  max-width: 38rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- math */
+.mathblock { margin: 1.25rem 0; overflow-x: auto; overflow-y: hidden; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* ---------------------------------------------------------------- mermaid */
+pre.mermaid {
+  padding: 0.75rem;
+  background: var(--bg-soft);
+  text-align: center;
+  line-height: 1;
+}
+pre.mermaid > svg { max-width: 100%; height: auto; }
+pre.mermaid:not([data-processed]) { visibility: hidden; }
+
+/* ---------------------------------------------------------------- footer */
+.pagefoot {
+  margin-top: 4rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.83rem;
+  color: var(--muted);
+}
+.pagefoot p { margin: 0.4rem 0; }
+.totop { display: inline-block; margin-top: 1rem; font-size: 0.83rem; }
+
+/* ---------------------------------------------------------------- narrow */
+@media (max-width: 60rem) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .sidebar { display: none; }
+  main { padding-top: 1.5rem; max-width: none; }
+  .toc-mobile {
+    display: block;
+    margin: 0 0 2rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.86rem;
+  }
+  .toc-mobile summary { cursor: pointer; font-weight: 650; }
+  .toc-mobile .toc-list { margin-top: 0.6rem; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.3rem; }
+}
+
+</style>
+<script>
+  // Inline math is $...$, display math is $$...$$. Code and pre are skipped, so a
+  // shell prompt inside a code block is never treated as a delimiter.
+  window.MathJax = {
+    tex: {
+      inlineMath: [["$", "$"], ["\\(", "\\)"]],
+      displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+      processEscapes: true,
+      tags: "none"
+    },
+    options: {
+      skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+    }
+  };
+</script>
+<script id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="#top">MikuMotionTools</a>
+  <nav class="topnav">
+    <a href="https://github.com/T-K-233/MikuMotionTools">GitHub</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav class="toc" aria-label="Contents">
+      <p class="toc-title">Contents</p>
+      <ul class="toc-list">
+<li class="lvl2"><a href="#the-hub-format">The hub format</a></li>
+<li class="lvl3"><a href="#module-map">Module map</a></li>
+<li class="lvl3"><a href="#naming-rules">Naming rules</a></li>
+<li class="lvl2"><a href="#install">Install</a></li>
+<li class="lvl3"><a href="#install-the-library">Install the library</a></li>
+<li class="lvl3"><a href="#install-the-blender-side-dependency">Install the Blender-side dependency</a></li>
+<li class="lvl3"><a href="#get-the-assets">Get the assets</a></li>
+<li class="lvl2"><a href="#usage">Usage</a></li>
+<li class="lvl3"><a href="#command-line">Command line</a></li>
+<li class="lvl3"><a href="#walkthrough-animation-robot">Walkthrough: animation → robot</a></li>
+<li class="lvl3"><a href="#walkthrough-robot-animation">Walkthrough: robot → animation</a></li>
+<li class="lvl2"><a href="#the-dataset-remote">The dataset remote</a></li>
+<li class="lvl3"><a href="#where-the-remote-is">Where the remote is</a></li>
+<li class="lvl3"><a href="#what-a-name-moves">What a name moves</a></li>
+<li class="lvl3"><a href="#reading-a-motion-without-a-pull">Reading a motion without a pull</a></li>
+<li class="lvl3"><a href="#hugging-face">Hugging Face</a></li>
+<li class="lvl3"><a href="#s3">S3</a></li>
+<li class="lvl3"><a href="#another-backend">Another backend</a></li>
+<li class="lvl2"><a href="#the-motion-format">The motion format</a></li>
+<li class="lvl3"><a href="#the-in-memory-form">The in-memory form</a></li>
+<li class="lvl3"><a href="#entity-paths">Entity paths</a></li>
+<li class="lvl3"><a href="#the-frame-graph">The frame graph</a></li>
+<li class="lvl3"><a href="#the-goal-not-the-pose-reached">The goal, not the pose reached</a></li>
+<li class="lvl3"><a href="#reading-a-motion">Reading a motion</a></li>
+<li class="lvl3"><a href="#why-several-files-open-as-one-recording">Why several files open as one recording</a></li>
+<li class="lvl2"><a href="#conventions">Conventions</a></li>
+<li class="lvl3"><a href="#axes-and-units">Axes and units</a></li>
+<li class="lvl3"><a href="#blender-bone-frames">Blender bone frames</a></li>
+<li class="lvl3"><a href="#quaternion-order">Quaternion order</a></li>
+<li class="lvl3"><a href="#velocities">Velocities</a></li>
+<li class="lvl3"><a href="#frame-rate">Frame rate</a></li>
+<li class="lvl3"><a href="#body-naming">Body naming</a></li>
+<li class="lvl2"><a href="#theory-animation-robot">Theory: animation → robot</a></li>
+<li class="lvl3"><a href="#stage-1-read-the-armature">Stage 1: read the armature</a></li>
+<li class="lvl3"><a href="#stage-2-the-ik-problem">Stage 2: the IK problem</a></li>
+<li class="lvl3"><a href="#the-rest-offset">The rest offset</a></li>
+<li class="lvl3"><a href="#the-differential-ik-step">The differential IK step</a></li>
+<li class="lvl3"><a href="#task-weights-and-pole-targets">Task weights and pole targets</a></li>
+<li class="lvl3"><a href="#the-posture-regularizer">The posture regularizer</a></li>
+<li class="lvl3"><a href="#the-per-frame-loop">The per-frame loop</a></li>
+<li class="lvl3"><a href="#what-the-solve-writes">What the solve writes</a></li>
+<li class="lvl2"><a href="#theory-robot-animation">Theory: robot → animation</a></li>
+<li class="lvl3"><a href="#stage-1-forward-kinematics">Stage 1: forward kinematics</a></li>
+<li class="lvl3"><a href="#stage-2-play-a-motion-on-the-robots-rig">Stage 2: play a motion on the robot's rig</a></li>
+<li class="lvl3"><a href="#stage-3-robot-rig-to-character-rig">Stage 3: robot rig to character rig</a></li>
+<li class="lvl3"><a href="#chains-against-ball-joints">Chains against ball joints</a></li>
+<li class="lvl2"><a href="#repository-layout">Repository layout</a></li>
+<li class="lvl2"><a href="#references">References</a></li>
+</ul>
+    </nav>
+  </aside>
+
+  <main id="top">
+    <details class="toc-mobile">
+      <summary>Contents</summary>
+      <ul class="toc-list">
+<li class="lvl2"><a href="#the-hub-format">The hub format</a></li>
+<li class="lvl3"><a href="#module-map">Module map</a></li>
+<li class="lvl3"><a href="#naming-rules">Naming rules</a></li>
+<li class="lvl2"><a href="#install">Install</a></li>
+<li class="lvl3"><a href="#install-the-library">Install the library</a></li>
+<li class="lvl3"><a href="#install-the-blender-side-dependency">Install the Blender-side dependency</a></li>
+<li class="lvl3"><a href="#get-the-assets">Get the assets</a></li>
+<li class="lvl2"><a href="#usage">Usage</a></li>
+<li class="lvl3"><a href="#command-line">Command line</a></li>
+<li class="lvl3"><a href="#walkthrough-animation-robot">Walkthrough: animation → robot</a></li>
+<li class="lvl3"><a href="#walkthrough-robot-animation">Walkthrough: robot → animation</a></li>
+<li class="lvl2"><a href="#the-dataset-remote">The dataset remote</a></li>
+<li class="lvl3"><a href="#where-the-remote-is">Where the remote is</a></li>
+<li class="lvl3"><a href="#what-a-name-moves">What a name moves</a></li>
+<li class="lvl3"><a href="#reading-a-motion-without-a-pull">Reading a motion without a pull</a></li>
+<li class="lvl3"><a href="#hugging-face">Hugging Face</a></li>
+<li class="lvl3"><a href="#s3">S3</a></li>
+<li class="lvl3"><a href="#another-backend">Another backend</a></li>
+<li class="lvl2"><a href="#the-motion-format">The motion format</a></li>
+<li class="lvl3"><a href="#the-in-memory-form">The in-memory form</a></li>
+<li class="lvl3"><a href="#entity-paths">Entity paths</a></li>
+<li class="lvl3"><a href="#the-frame-graph">The frame graph</a></li>
+<li class="lvl3"><a href="#the-goal-not-the-pose-reached">The goal, not the pose reached</a></li>
+<li class="lvl3"><a href="#reading-a-motion">Reading a motion</a></li>
+<li class="lvl3"><a href="#why-several-files-open-as-one-recording">Why several files open as one recording</a></li>
+<li class="lvl2"><a href="#conventions">Conventions</a></li>
+<li class="lvl3"><a href="#axes-and-units">Axes and units</a></li>
+<li class="lvl3"><a href="#blender-bone-frames">Blender bone frames</a></li>
+<li class="lvl3"><a href="#quaternion-order">Quaternion order</a></li>
+<li class="lvl3"><a href="#velocities">Velocities</a></li>
+<li class="lvl3"><a href="#frame-rate">Frame rate</a></li>
+<li class="lvl3"><a href="#body-naming">Body naming</a></li>
+<li class="lvl2"><a href="#theory-animation-robot">Theory: animation → robot</a></li>
+<li class="lvl3"><a href="#stage-1-read-the-armature">Stage 1: read the armature</a></li>
+<li class="lvl3"><a href="#stage-2-the-ik-problem">Stage 2: the IK problem</a></li>
+<li class="lvl3"><a href="#the-rest-offset">The rest offset</a></li>
+<li class="lvl3"><a href="#the-differential-ik-step">The differential IK step</a></li>
+<li class="lvl3"><a href="#task-weights-and-pole-targets">Task weights and pole targets</a></li>
+<li class="lvl3"><a href="#the-posture-regularizer">The posture regularizer</a></li>
+<li class="lvl3"><a href="#the-per-frame-loop">The per-frame loop</a></li>
+<li class="lvl3"><a href="#what-the-solve-writes">What the solve writes</a></li>
+<li class="lvl2"><a href="#theory-robot-animation">Theory: robot → animation</a></li>
+<li class="lvl3"><a href="#stage-1-forward-kinematics">Stage 1: forward kinematics</a></li>
+<li class="lvl3"><a href="#stage-2-play-a-motion-on-the-robots-rig">Stage 2: play a motion on the robot's rig</a></li>
+<li class="lvl3"><a href="#stage-3-robot-rig-to-character-rig">Stage 3: robot rig to character rig</a></li>
+<li class="lvl3"><a href="#chains-against-ball-joints">Chains against ball joints</a></li>
+<li class="lvl2"><a href="#repository-layout">Repository layout</a></li>
+<li class="lvl2"><a href="#references">References</a></li>
+</ul>
+    </details>
+
+<h1 id="mikumotiontools">MikuMotionTools</h1>
+<p>MikuMotionTools converts motion data between character animation and humanoid robot reinforcement learning (RL). It sits between <em>animation-world</em> motion, such as MMD dances, mocap takes and Blender rigs, and <em>robotics-world</em> motion, which is a robot's joint angles and link poses. It translates in both directions.</p>
+<ul><li><strong>animation → robot</strong> builds reference motions for RL training from a Blender armature.</li><li><strong>robot → animation</strong> shows what a trained policy did, as a character animation.</li></ul>
+<p>One data structure holds everything: a <a href="https://rerun.io">Rerun</a> <code>.rrd</code> motion file. Every other module converts into or out of that format.</p>
+<h2 id="the-hub-format">The hub format<a class="anchor" href="#the-hub-format" aria-label="Link to this section">#</a></h2>
+<pre class="mermaid">flowchart TB
+  A["&lt;b&gt;Blender armature&lt;/b&gt;&lt;br/&gt;MMD dance, mocap take"]
+  B["&lt;b&gt;ROS 2 .mcap log&lt;/b&gt;&lt;br/&gt;trained policy rollout"]
+  H(["&lt;b&gt;Motion store&lt;/b&gt;&lt;br/&gt;Rerun .rrd"])
+  C["&lt;b&gt;Robot joint angles&lt;/b&gt;&lt;br/&gt;RL reference motion"]
+  D["&lt;b&gt;Character animation&lt;/b&gt;&lt;br/&gt;VRM rig, rendered video"]
+
+  A --&gt;|"armature_to_motion"| H
+  B --&gt;|"robot_log_to_motion"| H
+  H --&gt;|"MotionRetargetingIK"| C
+  H --&gt;|"motion_to_armature&lt;br/&gt;retarget_armature"| D
+
+  classDef hub fill:#e8eefc,stroke:#3b5bdb,stroke-width:2px;
+  class H hub</pre>
+<p>A converter that writes straight to its destination needs one code path per source and destination pair. Four sources and four destinations then need sixteen paths. A hub format needs eight: one reader and one writer per endpoint. The hub also gives every stage the same viewer, the same field names and the same units.</p>
+<p>The hub is not only an interchange file. It is also the record of what happened. The <code>&lt;robot&gt;/</code> layer holds the joint angles a solve reached and, beside them, the goal it was aiming at. The gap between the robot the joints draw and its goal gizmos is the retargeting error, frame by frame, in one file.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th></th>
+<th>animation → robot</th>
+<th>robot → animation</th>
+</tr></thead><tbody>
+<tr><td>Source</td><td>a Blender armature with an animation</td><td>a ROS 2 <code>.mcap</code> log</td></tr>
+<tr><td>Hub write</td><td><code>reference/&lt;motion&gt;.rrd</code></td><td><code>reference/&lt;motion&gt;.rrd</code> and <code>&lt;robot&gt;/&lt;motion&gt;.rrd</code></td></tr>
+<tr><td>Hard step</td><td>inverse kinematics (IK)</td><td>forward kinematics (FK), then a rotation transfer</td></tr>
+<tr><td>Product</td><td><code>&lt;robot&gt;/&lt;motion&gt;.rrd</code>, the one file an RL run reads</td><td>a keyframed Blender rig, and an <code>.mp4</code></td></tr>
+<tr><td>Entry point</td><td><code>convert_mocap_to_motion.py</code>, then <code>mikumotion retarget</code></td><td><code>mikumotion import</code>, then <code>convert_motion_to_robot.py</code></td></tr>
+</tbody></table></div>
+<h3 id="module-map">Module map<a class="anchor" href="#module-map" aria-label="Link to this section">#</a></h3>
+<pre class="mermaid">flowchart LR
+  subgraph anim["animation side — needs bpy"]
+    BL["blender.py&lt;br/&gt;&lt;i&gt;armature_to_motion&lt;br/&gt;motion_to_armature&lt;br/&gt;motion_to_robot_armature&lt;br/&gt;retarget_armature&lt;/i&gt;"]
+    BS["blender_scene.py&lt;br/&gt;&lt;i&gt;dress_scene, render_animation&lt;/i&gt;"]
+  end
+  subgraph free["no heavy dependency"]
+    UR["urdf.py&lt;br/&gt;&lt;i&gt;RobotModel&lt;/i&gt;"]
+    AT["armature_tree.py&lt;br/&gt;&lt;i&gt;ArmatureTree&lt;/i&gt;"]
+    MA["math.py&lt;br/&gt;&lt;i&gt;quaternions&lt;/i&gt;"]
+    PR["presets.py&lt;br/&gt;&lt;i&gt;bone maps&lt;/i&gt;"]
+    MC["mcap_io.py&lt;br/&gt;&lt;i&gt;read_robot_log&lt;/i&gt;"]
+    MU["mujoco_utils.py&lt;br/&gt;&lt;i&gt;add_body_frames&lt;/i&gt;"]
+  end
+  subgraph hubmod["the hub"]
+    MS["motion_sequence.py&lt;br/&gt;&lt;i&gt;MotionSequence&lt;br/&gt;MotionStore&lt;/i&gt;"]
+  end
+  subgraph robo["robot side — needs mujoco"]
+    FK["forward_kinematics.py&lt;br/&gt;&lt;i&gt;robot_log_to_motion&lt;/i&gt;"]
+    IK["motion_retargeting.py&lt;br/&gt;&lt;i&gt;MotionRetargetingIK&lt;/i&gt;"]
+  end
+  CLI["cli.py"]
+  MR["motion_remote.py&lt;br/&gt;&lt;i&gt;HuggingFaceRemote&lt;br/&gt;S3Remote&lt;/i&gt;"]
+  SC["scripts/blender/&lt;br/&gt;convert_*_to_*.py"]
+
+  BL &lt;--&gt; MS
+  FK --&gt; MS
+  IK &lt;--&gt; MS
+  MC --&gt; FK
+  MU --&gt; IK
+  UR --&gt; AT
+  UR --&gt; BL
+  AT --&gt; BL
+  MA --&gt; MS
+  MA --&gt; UR
+  PR --&gt; IK
+  PR --&gt; BL
+  CLI --&gt; MS
+  CLI --&gt; FK
+  CLI --&gt; IK
+  CLI --&gt; MR
+  MS --&gt; MR
+  BL --&gt; SC
+  BS --&gt; SC
+
+  classDef hub fill:#e8eefc,stroke:#3b5bdb,stroke-width:2px;
+  class MS hub</pre>
+<p>An arrow means that the module at its tail feeds the module at its head. The map shows the principal paths, not every import.</p>
+<p><code>urdf.py</code>, <code>armature_tree.py</code>, <code>math.py</code>, <code>presets.py</code> and <code>mujoco_utils.py</code> import the standard library and numpy alone, so Blender's bundled Python can import them. <code>mujoco_utils.py</code> builds MuJoCo scene XML as text, and the caller compiles it, so the module needs no mujoco of its own. <code>motion_sequence.py</code> is the only module that touches the Rerun read and write API, and the only module that knows the quaternion order difference between Rerun and <code>MotionSequence</code>.</p>
+<h3 id="naming-rules">Naming rules<a class="anchor" href="#naming-rules" aria-label="Link to this section">#</a></h3>
+<p>Conversions are named <code>a_to_b</code>, so an inverse pair reads as one on sight: <code>armature_to_motion</code> against <code>motion_to_armature</code>. Use <code>from_</code> for constructors, as in <code>RobotModel.from_file(path)</code>. Use <code>to_</code> for a method that converts the object it belongs to, as in <code>robot.to_armature_tree()</code>.</p>
+<h2 id="install">Install<a class="anchor" href="#install" aria-label="Link to this section">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Component</th>
+<th>Version</th>
+<th>Needed for</th>
+</tr></thead><tbody>
+<tr><td>Python</td><td>3.10 or later</td><td>the library and the command line</td></tr>
+<tr><td><a href="https://docs.astral.sh/uv/">uv</a></td><td>any</td><td>the install steps below</td></tr>
+<tr><td>Blender</td><td>4.x</td><td>every Blender-side script</td></tr>
+<tr><td><code>rerun</code> binary</td><td>0.36 or later</td><td><code>mikumotion view</code></td></tr>
+<tr><td>FFmpeg</td><td>any</td><td>the <code>--video</code> option of the render scripts (<code>MIKUMOTION_FFMPEG</code> overrides the path)</td></tr>
+</tbody></table></div>
+<p>The <code>rerun</code> binary arrives with the <code>rerun-sdk</code> package, so the steps below cover it.</p>
+<h3 id="install-the-library">Install the library<a class="anchor" href="#install-the-library" aria-label="Link to this section">#</a></h3>
+<pre><code class="language-bash">git clone https://github.com/T-K-233/MikuMotionTools.git</code></pre>
+<pre><code class="language-bash">cd ./MikuMotionTools/</code></pre>
+<pre><code class="language-bash">uv pip install -e .</code></pre>
+<pre><code class="language-bash">uv sync</code></pre>
+<pre><code class="language-bash">uv sync --extra examples</code></pre>
+<pre><code class="language-bash">uv sync --extra hf</code></pre>
+<p>The <code>examples</code> extra carries the <code>daqp</code> QP solver and the rate limiter that <code>mikumotion retarget</code> imports. Skip it only if you never run an IK solve. The <code>hf</code> extra carries <code>huggingface_hub</code>, which <code>mikumotion push</code> and <code>mikumotion pull</code> need, and the <code>s3</code> extra carries <code>boto3</code> for a bucket instead. Skip both on a machine that reads a store it already has. See <a href="#the-dataset-remote">the dataset remote</a>.</p>
+<p>Check the install:</p>
+<pre><code class="language-bash">mikumotion list</code></pre>
+<p>The command prints one line per motion in <code>data/motions/reference/</code>. An empty store prints nothing.</p>
+<h3 id="install-the-blender-side-dependency">Install the Blender-side dependency<a class="anchor" href="#install-the-blender-side-dependency" aria-label="Link to this section">#</a></h3>
+<p>Blender runs the scripts in <code>scripts/blender/</code> with its own bundled Python, not with the environment above. That Python needs <code>rerun-sdk</code> to read and write the motion store. Install it once per Blender version:</p>
+<pre><code class="language-bash">&lt;blender&gt;/python/bin/python.exe -m pip install rerun-sdk</code></pre>
+<p>Replace <code>&lt;blender&gt;</code> with the Blender install directory. On Linux and macOS the executable is <code>python3.11</code> rather than <code>python.exe</code>, under the same <code>python/bin/</code> directory.</p>
+<div class="callout note"><p><span class="callout-label">Note</span> The Blender scripts add the current working directory to <code>sys.path</code>. Start Blender from the repository root, so that <code>import mikumotion</code> resolves.</p></div>
+<h3 id="get-the-assets">Get the assets<a class="anchor" href="#get-the-assets" aria-label="Link to this section">#</a></h3>
+<p>The repository does not carry the robot assets, the Blender project files or the MMD motions. <code>.gitignore</code> excludes <code>data/robots/</code> for size, and the license of the animation assets does not permit redistribution.</p>
+<pre><code>data/robots/&lt;vendor&gt;/&lt;robot&gt;/mjcf/     the MJCF used for FK and IK
+data/robots/&lt;vendor&gt;/&lt;robot&gt;/urdf/     the URDF used for geometry and for rigs
+data/robots/&lt;vendor&gt;/&lt;robot&gt;/meshes/   the visual meshes
+blender-projects/                      the Blender project files</code></pre>
+<p><a href="https://github.com/T-K-233/MikuMotionTools/blob/main/data/motions/MMD-Motion-Sources.md"><code>data/motions/MMD-Motion-Sources.md</code></a> links to the original author of each MMD motion. Internal developers can use the <a href="https://drive.google.com/drive/folders/1sFQmo_UvkY5xSIZKLjXLxlAOpLdI_1jz?usp=drive_link">Google Drive mirror</a>.</p>
+<p>Converted motions do not come from either place. They come from the dataset remote, which holds the store itself:</p>
+<pre><code class="language-bash">mikumotion pull zamuza</code></pre>
+<p>A machine that only reads motions needs nothing else: no Blender, no robot asset, and no MMD source. See <a href="#the-dataset-remote">the dataset remote</a>.</p>
+<p>Install the <a href="https://extensions.blender.org/add-ons/mmd-tools/">MMD Tools</a> add-on to import MMD models and motions into Blender. The add-on is not needed for mocap, and not needed for the robot → animation direction.</p>
+<h2 id="usage">Usage<a class="anchor" href="#usage" aria-label="Link to this section">#</a></h2>
+<p>MikuMotionTools has two front ends. The <code>mikumotion</code> command line handles everything that runs in a normal Python environment. The scripts in <code>scripts/blender/</code> handle everything that needs <code>bpy</code>, and Blender runs them.</p>
+<p>Both front ends address a motion by <strong>name</strong>, not by path. The layout of the store decides which stage lands in which file.</p>
+<pre class="mermaid">flowchart LR
+  subgraph blender["Blender runs these"]
+    MM["convert_character_to_mocap.py"]
+    E["convert_mocap_to_motion.py"]
+    AR["convert_motion_to_robot.py"]
+    RV["convert_motion_to_character.py"]
+  end
+  subgraph store["data/motions/"]
+    REF["reference/"]
+    ROB["&amp;lt;robot&amp;gt;/"]
+  end
+  subgraph shell["the mikumotion command"]
+    I["import"]
+    R["retarget"]
+    V["view"]
+    L["list"]
+    P["push / pull"]
+  end
+  RM(["dataset remote&lt;br/&gt;Hugging Face, S3"])
+
+  MM --&gt; E --&gt; REF
+  I --&gt; REF
+  I --&gt; ROB
+  REF --&gt; R --&gt; ROB
+  REF --&gt; V
+  ROB --&gt; V
+  REF --&gt; L
+  ROB --&gt; AR
+  ROB --&gt; RV
+  REF &lt;--&gt; P
+  ROB &lt;--&gt; P
+  P &lt;--&gt; RM</pre>
+<h3 id="command-line">Command line<a class="anchor" href="#command-line" aria-label="Link to this section">#</a></h3>
+<pre><code class="language-bash">mikumotion [--root DIR] &lt;command&gt; [ARGS]</code></pre>
+<p><code>--root DIR</code> selects the motion store directory. It defaults to <code>data/motions</code>, so run every command from the repository root.</p>
+<h4 id="mikumotion-import">mikumotion import<a class="anchor" href="#mikumotion-import" aria-label="Link to this section">#</a></h4>
+<p>Convert a robot <code>.mcap</code> log into a motion. The command writes both layers, because a log already carries the joint angles that the robot reached. Forward kinematics turns those angles into body poses, and both layers come from the one sequence.</p>
+<pre><code class="language-bash">mikumotion import &lt;log.mcap&gt; &lt;robot.xml&gt; &lt;robot.urdf&gt; [--name NAME]</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Argument</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>log.mcap</code></td><td>ROS 2 log with an <code>/odom</code> topic and a <code>/joint_states</code> topic</td></tr>
+<tr><td><code>robot.xml</code></td><td>Robot MJCF, used for forward kinematics</td></tr>
+<tr><td><code>robot.urdf</code></td><td>Robot URDF, whose geometry goes into the robot layer</td></tr>
+<tr><td><code>--name NAME</code></td><td>Motion name. Defaults to the <code>.mcap</code> file name</td></tr>
+</tbody></table></div>
+<h4 id="mikumotion-retarget">mikumotion retarget<a class="anchor" href="#mikumotion-retarget" aria-label="Link to this section">#</a></h4>
+<p>Solve a robot's joint angles for a motion, by inverse kinematics. The command reads <code>reference/&lt;name&gt;.rrd</code> and writes <code>&lt;robot&gt;/&lt;name&gt;.rrd</code>.</p>
+<pre><code class="language-bash">mikumotion retarget &lt;name&gt; &lt;robot.xml&gt; &lt;robot.urdf&gt; &lt;map&gt; [--view]</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Argument</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>name</code></td><td>Motion name in the store</td></tr>
+<tr><td><code>robot.xml</code></td><td>Target robot MJCF, used for the IK solve</td></tr>
+<tr><td><code>robot.urdf</code></td><td>Target robot URDF, whose geometry goes into the robot layer</td></tr>
+<tr><td><code>map</code></td><td>Map name from <code>mikumotion.presets.RETARGET_MAPS</code>, such as <code>ZAMUZA_TO_LITE_PRO</code></td></tr>
+<tr><td><code>--view</code></td><td>Follow the solve in a passive MuJoCo window, at a quarter of playback speed</td></tr>
+</tbody></table></div>
+<p>The command needs the rest pose of the source rig, stored as <code>&lt;name&gt;_reset</code>. See <a href="#the-rest-offset">the rest offset</a>.</p>
+<div class="callout note"><p><span class="callout-label">Note</span> The command writes <code>&lt;robot&gt;_frames.xml</code> beside the MJCF. That file is the robot plus two sets of marker bodies, which the <code>--view</code> window uses to draw where each link is and where the IK pulls it.</p></div>
+<h4 id="mikumotion-view">mikumotion view<a class="anchor" href="#mikumotion-view" aria-label="Link to this section">#</a></h4>
+<p>Open every layer of a motion in the Rerun viewer.</p>
+<pre><code class="language-bash">mikumotion view &lt;name&gt;</code></pre>
+<p>The command resolves the paths and hands them to the <code>rerun</code> binary. It runs no conversion.</p>
+<h4 id="mikumotion-list">mikumotion list<a class="anchor" href="#mikumotion-list" aria-label="Link to this section">#</a></h4>
+<p>Show the motions in the store, and the robots that each motion is solved for.</p>
+<pre><code class="language-bash">mikumotion list [--remote]</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Argument</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>--remote</code></td><td>List the dataset remote instead, as motion names and the layers each has</td></tr>
+</tbody></table></div>
+<p>The remote listing reports no frame count. Reading one would mean downloading the file that the listing exists to avoid downloading.</p>
+<h4 id="mikumotion-push">mikumotion push<a class="anchor" href="#mikumotion-push" aria-label="Link to this section">#</a></h4>
+<p>Send motions to the dataset remote.</p>
+<pre><code class="language-bash">mikumotion push [NAME ...]</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Argument</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>NAME ...</code></td><td>Motion names. With none, the whole store</td></tr>
+</tbody></table></div>
+<h4 id="mikumotion-pull">mikumotion pull<a class="anchor" href="#mikumotion-pull" aria-label="Link to this section">#</a></h4>
+<p>Fetch motions from the dataset remote into the store.</p>
+<pre><code class="language-bash">mikumotion pull [NAME ...]</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Argument</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>NAME ...</code></td><td>Motion names. With none, the whole remote</td></tr>
+</tbody></table></div>
+<p>Both commands print the paths that moved, and both take the remote from <code>MIKUMOTION_REMOTE</code>. See <a href="#the-dataset-remote">the dataset remote</a>.</p>
+<h4 id="blender-scripts">Blender scripts<a class="anchor" href="#blender-scripts" aria-label="Link to this section">#</a></h4>
+<p>Every script is named <code>convert_&lt;source&gt;_to_&lt;target&gt;.py</code>, the same <code>a_to_b</code> rule the library's functions follow, so the two pipelines read as a chain of file names:</p>
+<pre><code>character  -&gt;  mocap  -&gt;  motion  -&gt;  robot
+                            |
+                            +-------&gt;  character</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Script</th>
+<th>Step</th>
+<th>Arguments after <code>--</code></th>
+</tr></thead><tbody>
+<tr><td><code>convert_character_to_mocap.py</code></td><td>animation → robot, 1 of 3</td><td><code>&lt;preset&gt;</code></td></tr>
+<tr><td><code>convert_mocap_to_motion.py</code></td><td>animation → robot, 2 of 3</td><td><code>&lt;preset&gt;</code></td></tr>
+<tr><td><code>convert_motion_to_robot.py</code></td><td>robot → animation, 2 of 3</td><td><code>&lt;motion&gt; &lt;urdf&gt; [--video PATH]</code></td></tr>
+<tr><td><code>convert_motion_to_character.py</code></td><td>robot → animation, 3 of 3</td><td><code>&lt;motion&gt; &lt;urdf&gt; [--video PATH]</code></td></tr>
+</tbody></table></div>
+<p>The remaining step of each pipeline is a <code>mikumotion</code> subcommand: <code>retarget</code> finishes animation → robot, and <code>import</code> starts robot → animation.</p>
+<div class="callout note"><p><span class="callout-label">Note</span> These four run under Blender's own Python, because they need <code>bpy</code>. <code>uv run</code> cannot start them, however much the names read like it — use <code>blender … --python &lt;script&gt; --</code> as below.</p></div>
+<pre><code class="language-bash">blender ./blender-projects/zamuza.blend --python ./scripts/blender/convert_mocap_to_motion.py -- zamuza</code></pre>
+<pre><code class="language-bash">blender --background --python ./scripts/blender/convert_motion_to_robot.py -- lite_pro_tracking &lt;robot.urdf&gt; --video ./renders/robot.mp4</code></pre>
+<pre><code class="language-bash">blender ./character.blend --background --python ./scripts/blender/convert_motion_to_character.py -- lite_pro_tracking &lt;robot.urdf&gt; --video ./renders/character.mp4</code></pre>
+<p>Both <code>convert_motion_to_*</code> scripts take the robot layer to read from the <code>name</code> attribute of the URDF, and both build the robot's rig through the one <code>blender.motion_to_robot_armature</code>. <code>convert_motion_to_character.py</code> takes the first armature in the <code>.blend</code> file as the target character, which is why it looks for that armature before building the robot's.</p>
+<div class="callout warning"><p><span class="callout-label">Warning</span> Open the character <code>.blend</code> file with <code>convert_motion_to_character.py</code>, not the robot project. The script overwrites the F-curves of every mapped bone on the target armature.</p></div>
+<p>Blender is often built without FFmpeg, and no flag reports whether the encoder is there. The render scripts therefore always write a PNG sequence, then hand it to an external encoder. That encoder is <code>ffmpeg</code> on the path unless <code>MIKUMOTION_FFMPEG</code> names another one. It is a property of the machine rather than of a render, so it is an environment variable and not a flag.</p>
+<h3 id="walkthrough-animation-robot">Walkthrough: animation → robot<a class="anchor" href="#walkthrough-animation-robot" aria-label="Link to this section">#</a></h3>
+<pre class="mermaid">flowchart LR
+  MMD["character armature&lt;br/&gt;MMD, Mixamo, ActorCore"]
+  BL["mocap rig&lt;br/&gt;SMPL keypoint order"]
+  RST["reference/&amp;lt;name&amp;gt;_reset.rrd&lt;br/&gt;rest pose"]
+  REF["reference/&amp;lt;name&amp;gt;.rrd&lt;br/&gt;body poses"]
+  ROB["&amp;lt;robot&amp;gt;/&amp;lt;name&amp;gt;.rrd&lt;br/&gt;joint angles"]
+  IK{{"MotionRetargetingIK"}}
+
+  MMD --&gt;|"convert_character_to_mocap.py"| BL
+  BL --&gt;|"convert_mocap_to_motion.py"| RST
+  BL --&gt;|"convert_mocap_to_motion.py"| REF
+  RST --&gt; IK
+  REF --&gt; IK
+  IK --&gt;|"mikumotion retarget"| ROB</pre>
+<p><strong>1. Prepare the Blender project.</strong> Import the source motion, and set the scene frame rate to the policy update rate:</p>
+<pre><code class="language-python">bpy.context.scene.render.fps = 50</code></pre>
+<p><strong>2. Add the helper bones.</strong> Add one bone per body part that you want to export, named <code>&lt;smpl_name&gt;.frame</code>, such as <code>pelvis.frame</code> and <code>left_hand.frame</code>. Parent each helper bone to the rig bone that carries that body part.</p>
+<p>The helper bone gives the export a stable name and a stable axis convention on a rig whose own bones have neither. <code>armature_to_motion</code> reads the bone that matches <code>&lt;body_name&gt; + &quot;.frame&quot;</code>.</p>
+<p><strong>3. Add an export preset.</strong> Add an entry to <code>MOCAP_RIGS</code> in <code>mikumotion/presets.py</code>:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>armature</code></td><td><code>str</code></td><td>Name of the armature object in the <code>.blend</code> file</td></tr>
+<tr><td><code>scale</code></td><td><code>float</code></td><td>Factor that converts the rig's units to metres</td></tr>
+<tr><td><code>rotate_z</code></td><td><code>float</code></td><td>Rotation about world Z, in radians, that turns the rig to +X forward</td></tr>
+<tr><td><code>frames</code></td><td><code>(int, int)</code></td><td>First and last frame of the animation, inclusive</td></tr>
+<tr><td><code>bones</code></td><td><code>list[str]</code></td><td>Body parts to export, in SMPL keypoint order</td></tr>
+</tbody></table></div>
+<div class="callout warning"><p><span class="callout-label">Warning</span> Give each body part a distinct name. The store rejects a repeated name, because two bodies would write the same entity path and overwrite each other. A rig with a single spine bone fills one spine slot only.</p></div>
+<p><strong>4. Bake the character's animation onto the rig.</strong> Skip this step if the character's own rig carries the <code>.frame</code> helper bones from step 2. The <code>accad</code> and <code>actorcore</code> rigs do, and they export directly.</p>
+<p>Any other rig needs the animation transferred first. An MMD model is the usual case. It has hundreds of bones under Japanese names, and local axes that suit MMD rather than an export, so a helper bone on each one is impractical.</p>
+<p>Add an entry to <code>CHARACTER_RIGS</code> in <code>mikumotion/presets.py</code>, keyed by the same preset name:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>armature</code></td><td><code>str</code></td><td>Name of the character's armature object in the <code>.blend</code> file</td></tr>
+<tr><td><code>bone_map</code></td><td><code>dict[str, str]</code></td><td><code>{mocap bone: character bone}</code>, such as <code>{&quot;pelvis&quot;: &quot;下半身&quot;}</code></td></tr>
+<tr><td><code>translation_root</code></td><td><code>str</code></td><td>The character bone whose motion places the whole rig in the world</td></tr>
+</tbody></table></div>
+<p>Nothing in the script is specific to one format. A new source, such as Mixamo or ActorCore, is an entry in that table and a bone map beside <code>MMD_TO_ZAMUZA_BONE_MAP</code>. It is never another script.</p>
+<pre><code class="language-bash">blender ./blender-projects/zamuza.blend --background --python ./scripts/blender/convert_character_to_mocap.py -- zamuza</code></pre>
+<p>The transfer is the same <code>blender.retarget_armature</code> that bakes a robot rig onto a VRM character: both jobs put one rig's motion onto a differently proportioned rig. The script saves the <code>.blend</code> file, so the MMD armature is not needed again.</p>
+<p><strong>5. Export the motion.</strong></p>
+<pre><code class="language-bash">blender ./blender-projects/zamuza.blend --python ./scripts/blender/convert_mocap_to_motion.py -- zamuza</code></pre>
+<p>The script writes two files. <code>reference/zamuza_reset.rrd</code> holds the rig at rest, over two frames. <code>reference/zamuza.rrd</code> holds the animation. The IK solve needs both.</p>
+<p><strong>6. Add a retargeting map.</strong> Add an entry to <code>RETARGET_MAPS</code> in <code>mikumotion/presets.py</code>, which pairs each source body with a robot link and an orientation cost:</p>
+<pre><code class="language-python">ZAMUZA_TO_LITE_PRO = {
+    "pelvis": ("pelvis", 0.5),
+    "left_hand": ("left_hand", 0.5),
+    "left_shoulder": ("left_shoulder_yaw", 0.1),
+    # ...
+}</code></pre>
+<p>The IK always tracks position at cost 1.0. A high orientation cost, such as 0.5, pins the limb's orientation as well as its position. Use it for the pelvis, the chest, the head, the hands and the feet. A low cost, such as 0.1, lets the IK swing the segment freely and uses the orientation only to steer the elbow or the knee. Use it for the upper and lower arm, and for the upper and lower leg. See <a href="#task-weights-and-pole-targets">task weights and pole targets</a>.</p>
+<p><strong>7. Solve the robot's joints.</strong></p>
+<pre><code class="language-bash">mikumotion retarget zamuza ./data/robots/berkeley_humanoids/lite_pro/mjcf/lite_pro.xml ./data/robots/berkeley_humanoids/lite_pro/urdf/lite_pro.urdf ZAMUZA_TO_LITE_PRO</code></pre>
+<p>A progress bar reports the frames, and the command prints the output path when it finishes. Add <code>--view</code> to watch the solve. Cyan markers show where each link is, and magenta markers show where the IK pulls it.</p>
+<p><strong>8. Check the result.</strong></p>
+<pre><code class="language-bash">mikumotion view zamuza</code></pre>
+<p>Compare the goal gizmos against the robot's links. A goal is what the IK aimed at, so the gap between a gizmo and the link under it is the retargeting error for that frame. Both are in the robot layer, so <code>rerun data/motions/lite_pro/zamuza.rrd</code> shows the comparison on its own. Read the joint-angle plot on the right for steps and for saturation at a joint limit.</p>
+<p>A large and constant orientation error on one limb points at the retargeting map. A large error that appears only in fast frames points at the frame rate, or at a pose that the robot's joint limits cannot reach.</p>
+<p><strong>9. Share it.</strong></p>
+<pre><code class="language-bash">mikumotion push zamuza</code></pre>
+<p>The training run reads it from there, and needs no Blender, no MMD source and no robot asset. See <a href="#the-dataset-remote">the dataset remote</a>.</p>
+<h3 id="walkthrough-robot-animation">Walkthrough: robot → animation<a class="anchor" href="#walkthrough-robot-animation" aria-label="Link to this section">#</a></h3>
+<pre class="mermaid">flowchart LR
+  LOG["rollout.mcap&lt;br/&gt;/odom + /joint_states"]
+  REF["reference/&amp;lt;name&amp;gt;.rrd"]
+  ROB["&amp;lt;robot&amp;gt;/&amp;lt;name&amp;gt;.rrd"]
+  RIG["robot armature&lt;br/&gt;built from the URDF"]
+  CH["VRM character"]
+  MP4["renders/*.mp4"]
+
+  LOG --&gt;|"mikumotion import"| REF
+  LOG --&gt;|"mikumotion import"| ROB
+  ROB --&gt;|"motion_to_armature"| RIG
+  RIG --&gt;|"convert_motion_to_robot.py"| MP4
+  RIG --&gt;|"retarget_armature"| CH
+  CH --&gt;|"convert_motion_to_character.py"| MP4</pre>
+<p><strong>1. Import the log.</strong></p>
+<pre><code class="language-bash">mikumotion import ./data/logs/rollout.mcap ./data/robots/berkeley_humanoids/lite_pro/mjcf/lite_pro.xml ./data/robots/berkeley_humanoids/lite_pro/urdf/lite_pro.urdf --name lite_pro_tracking</code></pre>
+<p>The command prints the sequence summary and every file it wrote. A warning names any model joint that the log does not carry. Those joints stay at 0.</p>
+<p><strong>2. Check the import.</strong></p>
+<pre><code class="language-bash">mikumotion view lite_pro_tracking</code></pre>
+<p>The robot moves with its geometry, and the joint-angle plot follows it.</p>
+<p><strong>3. Render the robot.</strong></p>
+<pre><code class="language-bash">blender --background --python ./scripts/blender/convert_motion_to_robot.py -- lite_pro_tracking ./data/robots/berkeley_humanoids/lite_pro/urdf/lite_pro.urdf --video ./renders/robot.mp4</code></pre>
+<p>The script builds the armature from the URDF, imports the visual meshes, keys the motion onto the bones, and renders with a camera that follows the root body.</p>
+<p><strong>4. Render the character.</strong></p>
+<pre><code class="language-bash">blender ./blender-projects/nai_model.blend --background --python ./scripts/blender/convert_motion_to_character.py -- lite_pro_tracking ./data/robots/berkeley_humanoids/lite_pro/urdf/lite_pro.urdf --video ./renders/character.mp4</code></pre>
+<p>The script builds a hidden robot rig without meshes, and keys the motion onto it. It then bakes each VRM humanoid bone from the robot link that carries that segment's world orientation. The bone map is <code>presets.LITE_PRO_TO_VROID_BONE_MAP</code>.</p>
+<h2 id="the-dataset-remote">The dataset remote<a class="anchor" href="#the-dataset-remote" aria-label="Link to this section">#</a></h2>
+<p>A motion is written on one machine and read on several. The workstation that writes it needs Blender, an MMD source and a robot asset. A training run needs none of those: it needs the <code>.rrd</code> files. A deployment target, a colleague, and a run that repeats last month's result all need the same files.</p>
+<p>The store is a directory of files, so sharing it needs nothing more than a file transfer. The remote mirrors the layout one for one. A store-relative path, such as <code>reference/zamuza.rrd</code>, addresses the same file on both sides: <code>&lt;root&gt;/reference/zamuza.rrd</code> on disk, and <code>reference/zamuza.rrd</code> in the repository or the bucket.</p>
+<p>That mirror is the whole contract. The layout already names every file, so nothing keeps a manifest or an index of what is where. A backend is a class with three methods, and it inherits nothing:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Method</th>
+<th>Meaning</th>
+</tr></thead><tbody>
+<tr><td><code>paths()</code></td><td>every file the remote holds, as store-relative posix paths</td></tr>
+<tr><td><code>pull(paths, root)</code></td><td>copy those paths down, so each lands at <code>root / path</code></td></tr>
+<tr><td><code>push(paths, root)</code></td><td>copy each <code>root / path</code> up, to the same path</td></tr>
+</tbody></table></div>
+<p>No method knows what a motion is. <code>motion_paths</code> turns a motion name into a list of files, once, for every backend. A push and a pull therefore cannot disagree about which files a motion is, because both directions call the same function. One direction passes it a local listing, the other a remote one.</p>
+<h3 id="where-the-remote-is">Where the remote is<a class="anchor" href="#where-the-remote-is" aria-label="Link to this section">#</a></h3>
+<p>A URI names the remote and its scheme picks the backend.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>URI</th>
+<th>Backend</th>
+</tr></thead><tbody>
+<tr><td><code>hf://&lt;owner&gt;/&lt;name&gt;</code></td><td>a Hugging Face dataset repository</td></tr>
+<tr><td><code>hf://&lt;owner&gt;/&lt;name&gt;@&lt;revision&gt;</code></td><td>that repository at one branch, tag or commit</td></tr>
+<tr><td><code>hf://datasets/&lt;owner&gt;/&lt;name&gt;</code></td><td>the same repository, in the Hub's own URI form</td></tr>
+<tr><td><code>s3://&lt;bucket&gt;/&lt;prefix&gt;</code></td><td>an S3 bucket, the prefix standing in for the store root</td></tr>
+</tbody></table></div>
+<p>The <code>hf://datasets/...</code> form is the grammar that the <code>hf</code> command line takes, so one URI works with both tools: <code>hf download hf://datasets/your-org/mikumotion-motions</code> fetches the same dataset that <code>mikumotion pull</code> does.</p>
+<p><code>MIKUMOTION_REMOTE</code> holds the URI, so an environment is configured once instead of on every command. A training image sets it in its own environment, and every <code>pull</code> inside that image then needs no argument.</p>
+<pre><code class="language-bash">export MIKUMOTION_REMOTE=hf://your-org/mikumotion-motions</code></pre>
+<pre><code class="language-powershell">$env:MIKUMOTION_REMOTE = "hf://your-org/mikumotion-motions"</code></pre>
+<p>A revision pins a read. <code>hf://your-org/mikumotion-motions@v1.2</code> is one immutable set of motions, which is what a training run needs to stay reproducible after the dataset moves on. A bucket has no revisions, so give each release of an S3 dataset its own prefix instead.</p>
+<h3 id="what-a-name-moves">What a name moves<a class="anchor" href="#what-a-name-moves" aria-label="Link to this section">#</a></h3>
+<p>Both commands address a motion the way every other command does, by name.</p>
+<pre><code class="language-bash">mikumotion push zamuza</code></pre>
+<pre><code class="language-bash">mikumotion pull zamuza</code></pre>
+<p>A name selects every layer whose file has that stem, in whichever layer directory, plus the blueprint of each robot the motion was solved for. Pulling <code>zamuza</code> therefore brings <code>reference/zamuza.rrd</code>, <code>lite_pro/zamuza.rrd</code> and <code>blueprints/lite_pro.rbl</code>, and the motion opens in the viewer with the layout it was written for.</p>
+<p>A name never implies another name. <code>mikumotion retarget</code> needs the source rig's rest pose, stored as its own motion, so pull it too before a solve:</p>
+<pre><code class="language-bash">mikumotion pull zamuza zamuza_reset</code></pre>
+<p>With no name at all, both commands move the whole store. Only <code>.rrd</code> and <code>.rbl</code> files travel. The sources note beside them belongs to git, and the download metadata a pull leaves in <code>&lt;root&gt;/.cache</code> belongs to the machine that pulled.</p>
+<p>Transfers are idempotent. On Hugging Face they are also cheap to repeat. A push drops an unchanged file from the commit, and it makes no commit at all when nothing changed. A pull returns the file on disk, without downloading it, when the file and its recorded commit hash both match.</p>
+<p>A <code>pull</code> at the start of a training job is therefore mostly metadata, once the store is warm. An S3 transfer has no such check, so it re-sends the bytes.</p>
+<h3 id="reading-a-motion-without-a-pull">Reading a motion without a pull<a class="anchor" href="#reading-a-motion-without-a-pull" aria-label="Link to this section">#</a></h3>
+<p>The Rerun viewer takes more than a path. <code>rerun --help</code> lists an HTTP(S) URL to an <code>.rrd</code> or <code>.rbl</code> file among the inputs it loads. You can therefore open a motion where it sits on a public host, and the viewer pulls down only the parts it needs. That is why the store is a set of plain files addressed by path, and it is what the <code>.rrd</code> hub format was chosen for.</p>
+<p><code>mikumotion view</code> does not do this. It resolves names against the local store, so pull the motion first. The shortcut works for a public dataset only. <code>mikumotion push</code> creates a private repository, and a private file needs a signed URL that the viewer cannot request on its own.</p>
+<pre><code class="language-bash">rerun https://huggingface.co/datasets/&lt;owner&gt;/&lt;name&gt;/resolve/main/reference/zamuza.rrd</code></pre>
+<h3 id="hugging-face">Hugging Face<a class="anchor" href="#hugging-face" aria-label="Link to this section">#</a></h3>
+<p>The repository holds the store's own directories, so the dataset is browsable on the Hub and a reader can fetch one motion without cloning the rest.</p>
+<p>Each direction is one call to a <code>huggingface_hub</code> bulk helper, given the selected files as <code>allow_patterns</code>, rather than a loop over single files. That is where most of the behaviour comes from, and none of it is written here:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Direction</th>
+<th>Helper</th>
+<th>What the helper does</th>
+</tr></thead><tbody>
+<tr><td>push</td><td><code>HfApi.upload_folder</code></td><td>checks, uploads and commits in parallel; splits a large transfer into several commits; resumes when re-run; drops a file the Hub already holds</td></tr>
+<tr><td>pull</td><td><code>snapshot_download</code></td><td>fetches files concurrently; skips a file whose recorded commit hash still matches; writes the repository's structure into the store</td></tr>
+</tbody></table></div>
+<p>The Hub's docs name <code>upload_folder</code> and <code>snapshot_download</code> as the functions to reach for first, and <code>upload_large_folder</code> is deprecated in favour of <code>upload_folder</code>. Both match <code>allow_patterns</code> with <code>fnmatch</code>, so a motion whose name contains <code>*</code>, <code>?</code> or <code>[</code> would select more than itself. Motion names are plain identifiers, and keeping them that way is the reason this is a footnote rather than a bug.</p>
+<p>A pull records what it fetched in <code>&lt;root&gt;/.cache/huggingface/</code>. That is what the next pull reads to decide what to skip, and both helpers ignore the directory, so it never travels.</p>
+<p>Large files go to <strong>Xet</strong> storage rather than LFS. Xet splits a file into content-defined chunks and stores each distinct chunk once. That matters more here than it looks. Every <code>&lt;robot&gt;/&lt;motion&gt;.rrd</code> carries its own copy of the robot's geometry, about 9 MB of byte-identical mesh per motion. That copy is the price the store pays for a layer that opens on its own. On the Hub the copies collapse to one, however many motions the dataset holds.</p>
+<p>Set <code>HF_XET_HIGH_PERFORMANCE=1</code> to let a transfer use the whole machine.</p>
+<p>A repository that <code>mikumotion push</code> creates is <strong>private</strong>. The license of an MMD motion does not permit redistribution, and a motion retargeted from one carries that restriction with it. Make a dataset public on the Hub deliberately, once every motion in it allows that.</p>
+<p>Authentication is <code>huggingface_hub</code>'s own. Set <code>HF_TOKEN</code>, which is what a training image or a CI job should do, or run <code>hf auth login</code> once on a workstation.</p>
+<h3 id="s3">S3<a class="anchor" href="#s3" aria-label="Link to this section">#</a></h3>
+<p><code>boto3</code> reads its own credential chain: the environment, the shared credentials file, or the instance role a training node already runs under. A bucket needs nothing else, and the prefix takes the place of the store root.</p>
+<p><code>S3Remote</code> implements the same three methods over <code>list_objects_v2</code>, <code>download_file</code> and <code>upload_file</code>. It has no unchanged-file check, so it moves every file it is given. An ETag is an MD5 for a single-part upload only, which makes it unreliable as a content identity for a file this large. A size alone is too weak to trust.</p>
+<p>Neither backend ever sees a credential from MikuMotionTools. Each one asks its own library, which reads the token from wherever that library already keeps it.</p>
+<h3 id="another-backend">Another backend<a class="anchor" href="#another-backend" aria-label="Link to this section">#</a></h3>
+<p>A new backend is a class with those three methods, plus one entry in the scheme table of <code>uri_to_remote</code>. It subclasses nothing, so there is no base class to satisfy.</p>
+<p><code>tests/test_motion_remote.py</code> holds one such backend, <code>DirectoryRemote</code>. It meets the contract over a local directory with nothing but <code>shutil</code>, in ten lines. That is the proof that three methods are enough, and the reason the tests need no network.</p>
+<p>Rerun's own data platform is the other candidate, and its vocabulary already matches the store's. <code>rerun.catalog.CatalogClient</code> in 0.36 creates and reads datasets. A <code>DatasetEntry</code> exposes <code>segment_ids</code>, <code>register</code>, <code>register_prefix</code> and <code>register_blueprint</code>, and the <code>rerun</code> CLI has a <code>download</code> command for Rerun Hub.</p>
+<p>A catalog is a different shape of remote. It registers recordings that live at a URL rather than holding copies of files. A catalog would therefore read what a Hugging Face dataset already serves, instead of replacing it.</p>
+<h2 id="the-motion-format">The motion format<a class="anchor" href="#the-motion-format" aria-label="Link to this section">#</a></h2>
+<p>A motion is a Rerun <code>.rrd</code> recording. The store holds one directory per pipeline stage and one file per motion, which follows the <a href="https://huggingface.co/datasets/rerun/arkitscenes-rrd">Rerun dataset convention</a>:</p>
+<pre><code>data/motions/
+  reference/   &lt;motion&gt;.rrd   body poses as exported, robot-agnostic
+  &lt;robot&gt;/     &lt;motion&gt;.rrd   everything one robot needs for that motion
+  blueprints/  &lt;robot&gt;.rbl    viewer layout for that robot</code></pre>
+<p>A <strong>layer</strong> is a pipeline stage. A <strong>file</strong> is one motion segment: a dance, an episode, a take. File names match across layers, so <code>reference/zamuza.rrd</code> and <code>lite_pro/zamuza.rrd</code> are one segment at two stages.</p>
+<p>A robot layer is <strong>self-contained</strong>. It holds that robot's joints, the goal its links track, and its geometry, so a training run or a deployment reads that one file and needs no other. <code>reference/</code> is provenance: the export as it was, before any robot was chosen.</p>
+<h3 id="the-in-memory-form">The in-memory form<a class="anchor" href="#the-in-memory-form" aria-label="Link to this section">#</a></h3>
+<p><code>MotionSequence</code> is a plain mutable container. A producer allocates one and fills the arrays in place. For <code>F</code> frames, <code>D</code> joints and <code>B</code> bodies:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Field</th>
+<th>Shape</th>
+<th>Unit</th>
+<th>Description</th>
+</tr></thead><tbody>
+<tr><td><code>fps</code></td><td>scalar</td><td>Hz</td><td>frame rate</td></tr>
+<tr><td><code>joint_names</code></td><td><code>D</code></td><td>—</td><td>joint names, in the robot's own order</td></tr>
+<tr><td><code>body_names</code></td><td><code>B</code></td><td>—</td><td>body or link names</td></tr>
+<tr><td><code>joint_positions</code></td><td><code>(F, D)</code></td><td>rad</td><td>joint angles</td></tr>
+<tr><td><code>joint_velocities</code></td><td><code>(F, D)</code></td><td>rad/s</td><td>joint angular velocities</td></tr>
+<tr><td><code>body_positions</code></td><td><code>(F, B, 3)</code></td><td>m</td><td>link positions, world frame</td></tr>
+<tr><td><code>body_rotations</code></td><td><code>(F, B, 4)</code></td><td>—</td><td>link rotations, world frame, <code>(qw, qx, qy, qz)</code></td></tr>
+<tr><td><code>body_linear_velocities</code></td><td><code>(F, B, 3)</code></td><td>m/s</td><td>link linear velocities, world frame</td></tr>
+<tr><td><code>body_angular_velocities</code></td><td><code>(F, B, 3)</code></td><td>rad/s</td><td>link angular velocities, world frame</td></tr>
+</tbody></table></div>
+<p>Every field is world frame, not parent-relative. A consumer therefore needs no kinematic tree to place a body.</p>
+<h3 id="entity-paths">Entity paths<a class="anchor" href="#entity-paths" aria-label="Link to this section">#</a></h3>
+<p>Poses live in a <strong>group</strong>, one per layer: <code>reference/body</code> says where the exported rig's bodies are, and <code>&lt;robot&gt;/goal</code> says where a robot's links must reach. One function pairs a layer with its group, so the writer, the reader and the viewer layout cannot disagree about it. One writer and one reader serve either group:</p>
+<pre><code>/&lt;group&gt;/poses/&lt;name&gt;             Transform3D, one entity per body, one row per frame
+/&lt;group&gt;/frames/&lt;name&gt;            a gizmo bound to a coordinate frame, static
+/&lt;group&gt;/linear_velocities        Arrows3D, one row per frame, every body an instance
+/&lt;group&gt;/angular_velocities       Arrows3D
+/reference/body/...               those four, for the exported rig's own bodies
+/&lt;robot&gt;/goal/...                 those four, for where that robot's links must reach
+/&lt;robot&gt;/body/frames/&lt;link&gt;       a gizmo on every link frame of the joint chain
+/&lt;robot&gt;/joint/positions          Scalars, one row per frame, every joint an instance
+/&lt;robot&gt;/joint/velocities         Scalars
+/&lt;robot&gt;/tf                       Transform3D per joint, plus the root link's placement
+/&lt;robot&gt;/tf_static                the URDF's fixed transforms
+/&lt;robot&gt;/visual_geometries/...    the URDF's geometry, named by Rerun's URDF loader</code></pre>
+<p>Each body gets its own entity, so a body is addressable by name, and its own gizmo, so a 3D view can draw the frame that pose defines. The velocities stay in one batched entity each, one row per frame. A row per body would spend more bytes on Rerun row ids than on the data.</p>
+<p>A robot layer's <code>body</code> is not a pose group. It holds the link gizmos and nothing else, because the robot's own poses are the forward kinematics of its joints.</p>
+<h3 id="the-frame-graph">The frame graph<a class="anchor" href="#the-frame-graph" aria-label="Link to this section">#</a></h3>
+<p>Every entity that a 3D view draws must name a coordinate frame. An entity with no frame is an orphan. The viewer invents a frame for it, finds no route to the view's root, and draws an error in place of the entity. Scalars are exempt, because the viewer plots them against time.</p>
+<pre class="mermaid">flowchart TD
+  W(("world"))
+  W --&gt; RB["&lt;b&gt;reference/body/&amp;lt;name&amp;gt;&lt;/b&gt;&lt;br/&gt;one frame per exported body&lt;br/&gt;from /reference/body/poses/&amp;lt;name&amp;gt;"]
+  W --&gt; RL["&lt;b&gt;lite_pro/pelvis&lt;/b&gt;&lt;br/&gt;root link placement&lt;br/&gt;from /lite_pro/tf"]
+  RL --&gt; J["&lt;b&gt;lite_pro/&amp;lt;link&amp;gt;&lt;/b&gt;&lt;br/&gt;the URDF joint chain&lt;br/&gt;carries the visual geometry"]
+  W --&gt; LB["&lt;b&gt;lite_pro/goal/&amp;lt;link&amp;gt;&lt;/b&gt;&lt;br/&gt;where that link must reach&lt;br/&gt;from /lite_pro/goal/poses/&amp;lt;link&amp;gt;"]</pre>
+<p>A frame can have only one parent. A goal therefore names its own frames, <code>&lt;robot&gt;/goal/&lt;link&gt;</code>, because the joint chain in <code>/&lt;robot&gt;/tf</code> already defines a frame named <code>&lt;robot&gt;/&lt;link&gt;</code>.</p>
+<p>The layer prefix keeps a reference body apart from a robot link of the same name. It also lets you open two robots in one recording without one overwriting the other's entity paths.</p>
+<h3 id="the-goal-not-the-pose-reached">The goal, not the pose reached<a class="anchor" href="#the-goal-not-the-pose-reached" aria-label="Link to this section">#</a></h3>
+<p>A robot layer stores the <strong>goal</strong>, and says so in the path: <code>/&lt;robot&gt;/goal/</code> and not <code>/&lt;robot&gt;/body/</code>. The pose the solve reached is the forward kinematics of the joints in the same file, and <code>/&lt;robot&gt;/tf</code> already draws the robot there, so keeping it would repeat what the file already holds. The goal is recoverable from nothing else: it is the pose the IK aimed at and could not reach.</p>
+<p>A goal names the robot's own links, never the source rig's bodies, and its rotation is already carried onto the link's frame convention by the rest offset the solve measured. A tracking reward therefore compares it against the robot directly, and a reader needs no map between the two rigs — for <code>zamuza</code> on <code>lite_pro</code> the vocabularies differ, <code>spine1</code> against <code>chest</code>, and only the retargeting map in <code>presets.py</code> pairs them.</p>
+<p>Joints are never written to <code>reference/</code>, even when the sequence carries them. A joint angle means something for one robot only, so it belongs to that robot's layer.</p>
+<h3 id="reading-a-motion">Reading a motion<a class="anchor" href="#reading-a-motion" aria-label="Link to this section">#</a></h3>
+<pre><code class="language-python">from mikumotion.motion_sequence import MotionStore
+
+store = MotionStore("data/motions")
+
+motion = store.read_reference_motion("zamuza")               # the exported rig's own poses
+motion = store.read_robot_motion("zamuza", "lite_pro")       # that robot's joints + its goal</code></pre>
+<p>Each call reads one file. <code>read_robot_motion</code> returns the joints the solve reached, and body arrays that are the goal those joints were solved for, under the robot's own link names. That is what a training run tracks, so a training image needs the robot layer and nothing else.</p>
+<h3 id="why-several-files-open-as-one-recording">Why several files open as one recording<a class="anchor" href="#why-several-files-open-as-one-recording" aria-label="Link to this section">#</a></h3>
+<p>Every layer shares <code>application_id = &quot;mikumotion&quot;</code> and <code>recording_id = &lt;motion&gt;</code>. The viewer <a href="https://rerun.io/docs/concepts/apps-and-recordings">pools data by those two ids</a>, so several files open as one recording:</p>
+<pre><code class="language-bash">rerun data/motions/*/zamuza.rrd data/motions/blueprints/lite_pro.rbl</code></pre>
+<p>Each layer also embeds its own blueprint, so any one file opens sensibly alone. Blueprints do not merge, and the last one that the viewer loads wins. Pass <code>blueprints/&lt;robot&gt;.rbl</code> last.</p>
+<div class="callout note"><p><span class="callout-label">Note</span> Each motion's robot layer carries its own copy of the robot geometry. A shared geometry file would need a different recording id, and Rerun cannot compose a second recording against the motion (<a href="https://github.com/rerun-io/rerun/issues/7316">rerun-io/rerun#7316</a>).</p></div>
+<h2 id="conventions">Conventions<a class="anchor" href="#conventions" aria-label="Link to this section">#</a></h2>
+<h3 id="axes-and-units">Axes and units<a class="anchor" href="#axes-and-units" aria-label="Link to this section">#</a></h3>
+<p>The motion format is right-handed, Z up, +X forward, metres, radians and seconds. That matches MuJoCo, URDF and ROS.</p>
+<p>Blender rigs are authored +Y forward. <code>convert_mocap_to_motion.py</code> therefore turns each rig about world Z by the <code>rotate_z</code> value of its preset, and scales it to metres by the <code>scale</code> value.</p>
+<figure>
+<svg viewBox="0 0 660 260" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Two oblique views of the world frame. Z points up, X to the lower right and Y to the lower left. In the first the rig faces +Y, in the second a rotation about Z has turned it to face +X.">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="currentColor"/>
+    </marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--fig-red)"/>
+    </marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--fig-green)"/>
+    </marker>
+    <marker id="ahb" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--fig-blue)"/>
+    </marker>
+  </defs>
+  <g font-family="system-ui, sans-serif" font-size="13" fill="currentColor">
+
+    <!-- panel A: as authored in Blender, the rig faces +Y -->
+    <g transform="translate(20,26)">
+      <text x="95" y="0" text-anchor="middle" font-size="13" font-weight="600">as authored in Blender</text>
+
+      <!-- the ground plane, spanned by X and Y -->
+      <polygon points="95,150 142.6,177.5 95,205 47.4,177.5"
+               fill="var(--fig-blue-bg)" stroke="var(--fig-gray)"
+               stroke-width="0.8" opacity="0.5"/>
+
+      <!-- the rig stands along Z and faces +Y -->
+      <polygon points="56.9,172 107.1,157 82.9,143" fill="var(--fig-gray)" opacity="0.55"/>
+
+      <!-- the axis triad -->
+      <line x1="95" y1="150" x2="155.6" y2="185" stroke="var(--fig-red)"
+            stroke-width="2" marker-end="url(#ahr)"/>
+      <line x1="95" y1="150" x2="34.4" y2="185" stroke="var(--fig-green)"
+            stroke-width="2" marker-end="url(#ahg)"/>
+      <line x1="95" y1="150" x2="95" y2="65" stroke="var(--fig-blue)"
+            stroke-width="2" marker-end="url(#ahb)"/>
+      <circle cx="95" cy="150" r="3.5" fill="currentColor"/>
+      <text x="163" y="196" fill="var(--fig-red)">+X</text>
+      <text x="12" y="196" fill="var(--fig-green)">+Y</text>
+      <text x="86" y="56" fill="var(--fig-blue)">+Z</text>
+      <text x="30" y="152" font-size="12">faces +Y</text>
+    </g>
+
+    <!-- the rotation between the two panels -->
+    <g transform="translate(232,26)">
+      <line x1="18" y1="150" x2="108" y2="150" stroke="currentColor" stroke-width="1.6"
+            marker-end="url(#ah)"/>
+      <text x="63" y="140" text-anchor="middle" font-size="12">rotate_z</text>
+      <text x="63" y="172" text-anchor="middle" font-size="11" opacity="0.75">−π/2 rad here</text>
+    </g>
+
+    <!-- panel B: as stored in the motion, the rig faces +X -->
+    <g transform="translate(390,26)">
+      <text x="95" y="0" text-anchor="middle" font-size="13" font-weight="600">as stored in the motion</text>
+
+      <polygon points="95,150 142.6,177.5 95,205 47.4,177.5"
+               fill="var(--fig-blue-bg)" stroke="var(--fig-gray)"
+               stroke-width="0.8" opacity="0.5"/>
+
+      <polygon points="133.1,172 82.9,157 107.1,143" fill="var(--fig-gray)" opacity="0.55"/>
+
+      <line x1="95" y1="150" x2="155.6" y2="185" stroke="var(--fig-red)"
+            stroke-width="2" marker-end="url(#ahr)"/>
+      <line x1="95" y1="150" x2="34.4" y2="185" stroke="var(--fig-green)"
+            stroke-width="2" marker-end="url(#ahg)"/>
+      <line x1="95" y1="150" x2="95" y2="65" stroke="var(--fig-blue)"
+            stroke-width="2" marker-end="url(#ahb)"/>
+      <circle cx="95" cy="150" r="3.5" fill="currentColor"/>
+      <text x="163" y="196" fill="var(--fig-red)">+X</text>
+      <text x="12" y="196" fill="var(--fig-green)">+Y</text>
+      <text x="86" y="56" fill="var(--fig-blue)">+Z</text>
+      <text x="120" y="132" font-size="12">faces +X</text>
+    </g>
+  </g>
+</svg>
+<figcaption><b>Figure 1.</b> Oblique view of the world frame, right-handed with Z up. Blender
+rigs face +Y, and the robot convention is +X forward. <code>rotate_motion</code> turns every
+world-frame field about Z and leaves the joint angles alone. The axis colours are the ones the
+Rerun and MuJoCo gizmos use: X red, Y green, Z blue.</figcaption>
+</figure>
+<p><code>armature_to_motion</code> also cancels the rig's global XY offset. It subtracts the mean X and the mean Y of frame 0 from every frame. A motion therefore starts above the world origin, whatever the rig's placement in the <code>.blend</code> file. It leaves Z alone, so the rig keeps its height above the floor.</p>
+<h3 id="blender-bone-frames">Blender bone frames<a class="anchor" href="#blender-bone-frames" aria-label="Link to this section">#</a></h3>
+<p>A Blender bone carries its own axes, and they are not the axes a motion records. The bone's local +Y runs from its head to its tail, along the bone. Its local +Z is the roll reference, and the bone's roll angle turns +Z and +X about +Y. Its local +X completes the right-handed triple.</p>
+<p>A body frame in a motion follows the robot convention instead: +X forward, +Z up. A rig bone therefore cannot serve as a body frame. A thigh bone points down the leg, so its +Y points down the leg, and a hand bone points along the hand. The axes follow the skeleton rather than the world.</p>
+<p>The <code>.frame</code> helper bone settles this. Parent one child bone to each rig bone you want to export, and name it <code>&lt;body&gt;.frame</code>. Orient the helper so that its own axes are the axes you want recorded. <code>armature_to_motion</code> then reads the helper and never the rig bone: <code>bone_names</code> holds the body names, and the function appends <code>.frame</code> to each one.</p>
+<figure>
+<svg viewBox="0 0 660 272" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="A rig bone's local Y axis runs along the bone from head to tail. The frame helper bone, parented at the head, carries the axes the export records: X forward, Y left, Z up.">
+  <defs>
+    <marker id="bfr" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--fig-red)"/>
+    </marker>
+    <marker id="bfg" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--fig-green)"/>
+    </marker>
+    <marker id="bfb" markerWidth="9" markerHeight="9" refX="7" refY="3"
+            orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--fig-blue)"/>
+    </marker>
+  </defs>
+  <g font-family="system-ui, sans-serif" font-size="13" fill="currentColor">
+
+    <!-- panel A: the rig bone's own axes -->
+    <g transform="translate(30,26)">
+      <text x="115" y="0" text-anchor="middle" font-size="13" font-weight="600">a rig bone's own axes</text>
+
+      <!-- the bone, head upper left, tail lower right -->
+      <polygon points="70,60 96,86 172,162 84,74" fill="var(--fig-gray)" opacity="0.35"/>
+      <line x1="70" y1="60" x2="172" y2="162" stroke="currentColor" stroke-width="1.4"
+            opacity="0.7"/>
+      <circle cx="70" cy="60" r="4.5" fill="currentColor"/>
+      <text x="34" y="52" font-size="11" opacity="0.8">head</text>
+      <circle cx="172" cy="162" r="3" fill="currentColor" opacity="0.7"/>
+      <text x="178" y="176" font-size="11" opacity="0.8">tail</text>
+
+      <!-- the bone-local triad at the head: +Y along the bone -->
+      <line x1="70" y1="60" x2="128" y2="118" stroke="var(--fig-green)"
+            stroke-width="2.2" marker-end="url(#bfg)"/>
+      <text x="120" y="112" fill="var(--fig-green)" font-size="12">+Y</text>
+      <line x1="70" y1="60" x2="128" y2="34" stroke="var(--fig-red)"
+            stroke-width="2" marker-end="url(#bfr)"/>
+      <text x="134" y="32" fill="var(--fig-red)" font-size="12">+X</text>
+      <line x1="70" y1="60" x2="24" y2="26" stroke="var(--fig-blue)"
+            stroke-width="2" marker-end="url(#bfb)"/>
+      <text x="8" y="20" fill="var(--fig-blue)" font-size="12">+Z</text>
+      <text x="66" y="206" font-size="12" opacity="0.85">+Y follows the bone, so the</text>
+      <text x="66" y="224" font-size="12" opacity="0.85">triple follows the skeleton</text>
+    </g>
+
+    <!-- panel B: the .frame child -->
+    <g transform="translate(370,26)">
+      <text x="115" y="0" text-anchor="middle" font-size="13" font-weight="600">its <tspan font-family="ui-monospace, monospace">.frame</tspan> child</text>
+
+      <!-- the same bone, faint -->
+      <polygon points="70,60 96,86 172,162 84,74" fill="var(--fig-gray)" opacity="0.18"/>
+      <line x1="70" y1="60" x2="172" y2="162" stroke="currentColor" stroke-width="1.2"
+            opacity="0.3"/>
+      <circle cx="70" cy="60" r="4.5" fill="currentColor"/>
+      <text x="30" y="52" font-size="11" opacity="0.8">head</text>
+
+      <!-- the convention triad, oblique, matching Figure 1 -->
+      <line x1="70" y1="60" x2="130.6" y2="95" stroke="var(--fig-red)"
+            stroke-width="2.2" marker-end="url(#bfr)"/>
+      <text x="137" y="104" fill="var(--fig-red)" font-size="12">+X</text>
+      <line x1="70" y1="60" x2="9.4" y2="95" stroke="var(--fig-green)"
+            stroke-width="2.2" marker-end="url(#bfg)"/>
+      <text x="0" y="104" fill="var(--fig-green)" font-size="12">+Y</text>
+      <line x1="70" y1="60" x2="70" y2="16" stroke="var(--fig-blue)"
+            stroke-width="2.2" marker-end="url(#bfb)"/>
+      <text x="78" y="18" fill="var(--fig-blue)" font-size="12">+Z</text>
+      <text x="66" y="206" font-size="12" opacity="0.85">the head is the position,</text>
+      <text x="66" y="224" font-size="12" opacity="0.85">the pose matrix the rotation</text>
+    </g>
+  </g>
+</svg>
+<figcaption><b>Figure 2.</b> A rig bone's local +Y runs head to tail, so its axes follow the
+skeleton. The <code>.frame</code> child sits at the same head and carries the axes the export
+records. Point the helper to set two of its three axes, and roll it to set the third.</figcaption>
+</figure>
+<p>For each helper, <code>armature_to_motion</code> records two things. The position is the helper's head. The rotation is the helper's pose matrix. Both pass through <code>armature.matrix_world</code>, so a rig that is moved or turned as an object exports the same motion.</p>
+<p>Two consequences follow. Put the helper's head exactly where the body's origin belongs, because the head is the position that is recorded, and the helper's length changes nothing. Then set the orientation in two moves: where you point the helper fixes its +Y and therefore two of its three axes, and its roll fixes the last one.</p>
+<div class="callout note"><p><span class="callout-label">Note</span> The robot side needs no helper bones. <code>robot_model_to_armature</code> builds one bone per URDF link, and <code>motion_to_armature</code> drives those bones through <code>matrix_basis</code>, so the link frames come from the URDF rather than from a bone's head-to-tail axis.</p></div>
+<h3 id="quaternion-order">Quaternion order<a class="anchor" href="#quaternion-order" aria-label="Link to this section">#</a></h3>
+<p>Four libraries in this pipeline disagree about quaternion order:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Context</th>
+<th>Order</th>
+</tr></thead><tbody>
+<tr><td><code>MotionSequence.body_rotations</code></td><td><code>(w, x, y, z)</code></td></tr>
+<tr><td>Rerun <code>Transform3D</code></td><td><code>(x, y, z, w)</code></td></tr>
+<tr><td>ROS <code>geometry_msgs/Quaternion</code></td><td><code>(x, y, z, w)</code></td></tr>
+<tr><td>MuJoCo <code>xquat</code> and <code>qpos</code></td><td><code>(w, x, y, z)</code></td></tr>
+<tr><td>Blender <code>mathutils.Quaternion</code></td><td><code>(w, x, y, z)</code></td></tr>
+</tbody></table></div>
+<p>Two modules hold every conversion. <code>motion_sequence.py</code> converts on the Rerun boundary, with <code>quat_to_xyzw</code> and <code>quat_to_wxyz</code>. <code>mcap_io.py</code> converts on the ROS boundary, and normalizes the logged quaternion, because a logged value is not guaranteed to be unit length.</p>
+<p>Quaternion products follow the Hamilton convention. <code>quat_mul(a, b)</code> is the rotation matrix product $R_a R_b$, so a world-frame rotation post-multiplies.</p>
+<h3 id="velocities">Velocities<a class="anchor" href="#velocities" aria-label="Link to this section">#</a></h3>
+<p>Every producer calls <code>fill_body_velocities</code> instead of differencing poses itself. The linear part is a plain finite difference:</p>
+<div class="mathblock">
+$$
+v_t \;=\; \frac{p_t - p_{t-1}}{\Delta t}, \qquad \Delta t = \frac{1}{\mathrm{fps}}
+$$
+</div>
+<p>The angular part has two traps. First, Euler-angle rates are not an angular velocity, so the rotation between two consecutive frames has to produce it. Write that step as a quaternion:</p>
+<div class="mathblock">
+$$
+\Delta q_t \;=\; q_t \otimes q_{t-1}^{*}
+$$
+</div>
+<p>Second, that step must go the short way round. A quaternion and its negation are the same rotation, and a sign flip between frames reads as a near-full turn. Unflipped, it spikes the velocity at $2\pi\,\mathrm{fps}$. The fix negates any step with a negative real part. With $\Delta q_t = (w, \mathbf{u})$ and $s = \lVert \mathbf{u} \rVert$:</p>
+<div class="mathblock">
+$$
+\omega_t \;=\; \frac{\mathbf{u}}{\Delta t}\cdot\frac{2\,\mathrm{atan2}(s, w)}{s}
+$$
+</div>
+<p>The scale factor $2\,\mathrm{atan2}(s, w) / s$ tends to 2 as the step vanishes, so the implementation uses 2 where $s &lt; 10^{-12}$. Frame 0 keeps its zeros, because there is no earlier pose to difference against.</p>
+<p>The IK solve differences its own joint angles the same way, because <code>mink</code> integrates <code>qpos</code> and leaves <code>qvel</code> at zero. <code>mj_objectVelocity</code> would report every body as motionless.</p>
+<h3 id="frame-rate">Frame rate<a class="anchor" href="#frame-rate" aria-label="Link to this section">#</a></h3>
+<p>Match the frame rate of the motion to the policy update rate of the training environment, usually 50 Hz. A mismatch forces the training run to interpolate every frame, which costs time and blurs fast contact events. <code>convert_mocap_to_motion.py</code> asserts that the Blender scene is 50 fps. <code>mcap_io.py</code> infers the rate from the median sample period of the log, which ignores the gaps that dropped messages leave.</p>
+<h3 id="body-naming">Body naming<a class="anchor" href="#body-naming" aria-label="Link to this section">#</a></h3>
+<p>Name generic bodies after the <a href="https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18">SMPL-X joint names</a>. One name then means one body part across every rig and every retargeting map. Robot layers keep the robot's own link names instead, because those must match the URDF.</p>
+<h2 id="theory-animation-robot">Theory: animation → robot<a class="anchor" href="#theory-animation-robot" aria-label="Link to this section">#</a></h2>
+<p>The problem is a mapping between two skeletons that share a topology but not their proportions, their axis conventions or their degrees of freedom. A character's arm is a chain of ball joints. A robot's arm is a chain of 1-DOF hinges with hard limits. No rotation copy can satisfy both, so this direction solves an optimization problem instead.</p>
+<p>The direction runs in two stages. Stage 1 reads the Blender armature into the hub. Stage 2 solves the robot's joint angles by inverse kinematics.</p>
+<h3 id="stage-1-read-the-armature">Stage 1: read the armature<a class="anchor" href="#stage-1-read-the-armature" aria-label="Link to this section">#</a></h3>
+<p>For each frame $t$ and each helper bone $b$, <code>armature_to_motion</code> reads the bone's world pose from Blender:</p>
+<div class="mathblock">
+$$
+T_b(t) \;=\; M_{\text{world}} \, P_b(t)
+$$
+</div>
+<p>$M_{\text{world}}$ is the armature object's <code>matrix_world</code>, and $P_b(t)$ is the pose bone's <code>matrix</code>. A pose bone's own matrix is in <em>armature</em> space, so it is a world pose only when the armature object sits at the origin unrotated. The product makes a placed or turned rig export the same motion.</p>
+<p>The body position is the bone's <strong>head</strong>, not the centre of its matrix:</p>
+<div class="mathblock">
+$$
+p_b(t) \;=\; M_{\text{world}}\, h_b(t), \qquad
+R_b(t) \;=\; \mathrm{rot}\big(T_b(t)\big)
+$$
+</div>
+<p><code>convert_mocap_to_motion.py</code> then applies the preset: it scales the positions to metres, and turns every world-frame field about Z by <code>rotate_z</code>. It runs the export twice, once with the armature forced to <code>REST</code> and once with it in <code>POSE</code>, which produces <code>&lt;name&gt;_reset</code> and <code>&lt;name&gt;</code>.</p>
+<p>A rig has no joint angles, so this stage writes body poses only. Joint angles belong to a robot, and stage 2 produces them.</p>
+<h3 id="stage-2-the-ik-problem">Stage 2: the IK problem<a class="anchor" href="#stage-2-the-ik-problem" aria-label="Link to this section">#</a></h3>
+<p>The robot configuration is</p>
+<div class="mathblock">
+$$
+q \;=\; (\,p_{\text{base}},\; q_{\text{base}},\; \theta\,) \;\in\; \mathbb{R}^3 \times S^3 \times \mathbb{R}^{n}
+$$
+</div>
+<p>MuJoCo stores it as <code>qpos</code>, where a floating base occupies the first 7 entries and the $n$ hinge angles follow. Forward kinematics gives each link's world pose $T_i(q) \in SE(3)$.</p>
+<p>A description written for a fixed-base simulation pins its root link, which leaves the IK unable to place the robot in the world. <code>MotionRetargetingIK</code> therefore compiles the model through <code>MjSpec</code> and adds a free joint to the root body if it has none.</p>
+<p>The retargeting map lists the pairs to track. For a pair (source body $s$, robot link $i$) with orientation cost $w_i$, the target pose at frame $t$ is</p>
+<div class="mathblock">
+$$
+p^{*}_i(t) \;=\; p_s(t), \qquad
+R^{*}_i(t) \;=\; \underbrace{R_s(t)\, R_s^{\text{rest}\,\top}}_{\Delta R_s(t)} \; R_i^{0}
+\tag{1}
+$$
+</div>
+<p>$R_s^{\text{rest}}$ is the source bone's rotation in the rig's rest pose, and $R_i^{0}$ is the link's rotation at the robot's zero configuration. The next section explains why.</p>
+<h3 id="the-rest-offset">The rest offset<a class="anchor" href="#the-rest-offset" aria-label="Link to this section">#</a></h3>
+<p>A mocap bone and the link that it drives disagree about which way their axes point. The <code>zamuza</code> foot bone and the <code>lite_pro</code> foot link sit 90 degrees apart with both rigs at rest. Aiming the IK at the source's <em>absolute</em> orientation therefore twists the robot's foot by that much for the whole motion.</p>
+<figure>
+<svg viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="At rest the mocap bone frame and the robot link frame differ by a constant rotation. At frame t both turn by the same delta, so the constant rotation still holds.">
+  <defs>
+    <marker id="mr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--fig-red)"/></marker>
+    <marker id="mg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--fig-green)"/></marker>
+    <marker id="mk" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="currentColor"/></marker>
+    <marker id="mb" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--fig-blue)"/></marker>
+    <g id="fr2">
+      <line x1="0" y1="0" x2="56" y2="0" stroke="var(--fig-red)" stroke-width="2.2" marker-end="url(#mr)"/>
+      <line x1="0" y1="0" x2="0" y2="-56" stroke="var(--fig-green)" stroke-width="2.2" marker-end="url(#mg)"/>
+      <circle cx="0" cy="0" r="3.2" fill="currentColor"/>
+    </g>
+  </defs>
+  <g font-family="system-ui, sans-serif" font-size="12.5" fill="currentColor">
+
+    <text x="150" y="28" text-anchor="middle" font-weight="600">mocap rig</text>
+    <text x="490" y="28" text-anchor="middle" font-weight="600">robot</text>
+
+    <!-- row 1: rest -->
+    <text x="14" y="100" font-size="12" opacity="0.7">rest pose</text>
+    <use href="#fr2" transform="translate(150,128)"/>
+    <text x="150" y="156" text-anchor="middle">R_s^rest</text>
+    <use href="#fr2" transform="translate(490,128) rotate(-90)"/>
+    <text x="516" y="156">R_i^0</text>
+    <line x1="230" y1="110" x2="412" y2="110" stroke="currentColor" stroke-width="1.3"
+          stroke-dasharray="6 4" opacity="0.65" marker-end="url(#mk)"/>
+    <text x="322" y="100" text-anchor="middle">q_off, constant</text>
+
+    <!-- the same delta on both sides -->
+    <line x1="150" y1="186" x2="150" y2="222" stroke="var(--fig-blue)" stroke-width="1.7"
+          marker-end="url(#mb)"/>
+    <text x="160" y="209" fill="var(--fig-blue)">&#916;R_s(t)</text>
+    <line x1="490" y1="186" x2="490" y2="222" stroke="var(--fig-blue)" stroke-width="1.7"
+          marker-end="url(#mb)"/>
+    <text x="500" y="209" fill="var(--fig-blue)">the same &#916;R_s(t)</text>
+
+    <!-- row 2: frame t -->
+    <text x="14" y="256" font-size="12" opacity="0.7">frame t</text>
+    <use href="#fr2" transform="translate(150,284) rotate(-42)"/>
+    <text x="150" y="312" text-anchor="middle">R_s(t)</text>
+    <use href="#fr2" transform="translate(490,284) rotate(-132)"/>
+    <text x="516" y="300">R_i*(t) = &#916;R_s(t) &#183; R_i^0</text>
+    <line x1="230" y1="266" x2="412" y2="266" stroke="currentColor" stroke-width="1.3"
+          stroke-dasharray="6 4" opacity="0.65" marker-end="url(#mk)"/>
+    <text x="322" y="256" text-anchor="middle">the same q_off</text>
+  </g>
+</svg>
+<figcaption><b>Figure 3.</b> The rest offset. The constant rotation
+<code>q_off</code> between the two rest frames is measured once, from the
+<code>&lt;name&gt;_reset</code> motion and the robot's zero pose. Every frame then applies the
+source bone's rotation away from its own rest pose, so the offset never has to be tuned by
+hand.</figcaption>
+</figure>
+<p><code>rest_offsets</code> measures the constant part once, as a quaternion:</p>
+<div class="mathblock">
+$$
+q_{\text{off}} \;=\; \big(q_s^{\text{rest}}\big)^{*} \otimes\, q_i^{0}
+\tag{2}
+$$
+</div>
+<p>The per-frame target is then a single product, which is equation (1) written in quaternion form and regrouped:</p>
+<div class="mathblock">
+$$
+q^{*}_i(t) \;=\; q_s(t) \otimes q_{\text{off}}
+\;=\; \underbrace{q_s(t) \otimes \big(q_s^{\text{rest}}\big)^{*}}_{\Delta q_s(t)} \otimes\, q_i^{0}
+\tag{3}
+$$
+</div>
+<p>Equation (3) is one rule: <strong>take the source bone's world-frame rotation away from its own rest pose, and apply it to the link's rotation at the robot's zero pose.</strong> The rule cancels both rigs' axis conventions, so nobody has to tune an offset by hand.</p>
+<div class="callout note"><p><span class="callout-label">Note</span> The same rule drives the other direction. <code>desired_pose_matrix</code> in <code>blender.py</code> applies the source bone's world-frame rest delta to the target bone's rest orientation. Both directions compose the delta on the <strong>left</strong>, in world frame. See <a href="#stage-3-robot-rig-to-character-rig">the rotation transfer</a>.</p></div>
+<p>The solve needs <code>reference/&lt;name&gt;_reset.rrd</code> for $q_s^{\text{rest}}$, and stops with an assertion if that file is missing.</p>
+<h3 id="the-differential-ik-step">The differential IK step<a class="anchor" href="#the-differential-ik-step" aria-label="Link to this section">#</a></h3>
+<p>The solve is a differential IK, driven by <a href="https://github.com/kevinzakka/mink">mink</a>. Each iteration linearizes the tasks about the current configuration and solves one quadratic program (QP) for a configuration displacement $\Delta q$ in the tangent space:</p>
+<div class="mathblock">
+$$
+\min_{\Delta q}\;\; \sum_{k}\Big\lVert W_k \big( J_k(q)\,\Delta q + e_k(q) \big) \Big\rVert^2
+\;+\; \Big( \lambda + \textstyle\sum_k \mu_k \Big) \lVert \Delta q \rVert^2
+\qquad \text{subject to} \quad G\,\Delta q \le h
+\tag{4}
+$$
+</div>
+<p>The terms are:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Term</th>
+<th>Value here</th>
+<th>Meaning</th>
+</tr></thead><tbody>
+<tr><td>$e_k(q)$</td><td>—</td><td>task error. For a frame task it is the body twist $\log\!\big(T_i(q)^{-1} T^{*}_i\big) \in \mathbb{R}^6$</td></tr>
+<tr><td>$J_k(q)$</td><td>—</td><td>task Jacobian, $\partial e_k / \partial q$. For a frame task it has shape $6 \times n_v$</td></tr>
+<tr><td>$W_k$</td><td>$\mathrm{diag}(1,1,1,w_i,w_i,w_i)$</td><td>task weights: position cost 1.0, orientation cost $w_i$ from the map</td></tr>
+<tr><td>$\lambda$</td><td><code>DAMPING = 0.5</code></td><td>Tikhonov damping on every DOF, the floating base included</td></tr>
+<tr><td>$\mu_k$</td><td>$\nu \lVert W_k e_k \rVert^2$, $\nu =$ <code>lm_damping = 1.0</code></td><td>Levenberg–Marquardt damping, which grows with the task error</td></tr>
+<tr><td>$G\,\Delta q \le h$</td><td><code>ConfigurationLimit</code></td><td>$q \ominus q_{\min} \le \Delta q \le q_{\max} \ominus q$, the robot's joint limits</td></tr>
+</tbody></table></div>
+<p>The solver is <code>daqp</code>, through <code>qpsolvers</code>. <code>mink</code> then returns $v = \Delta q / \mathrm{d}t$ and <code>integrate_inplace(v, dt)</code> applies $q \leftarrow q \oplus v\,\mathrm{d}t$, so the timestep cancels. <code>ConfigurationLimit</code> ignores its <code>dt</code> argument, so the value of <code>model.opt.timestep</code> does not affect the result.</p>
+<p>The two damping terms do different jobs. $\lambda$ is constant and bounds the step everywhere. $\mu_k$ grows with the square of the task error. A task far from its target therefore takes a short, safe step, and a task near its target is barely damped.</p>
+<h3 id="task-weights-and-pole-targets">Task weights and pole targets<a class="anchor" href="#task-weights-and-pole-targets" aria-label="Link to this section">#</a></h3>
+<p>A humanoid IK problem is redundant. Many arm configurations put the hand in one place, and they differ in where the elbow points. Position tasks on the hands and feet alone therefore leave the elbows and knees free to flip from one solution to another between frames.</p>
+<p><code>ZAMUZA_TO_LITE_PRO</code> fixes that with two grades of orientation cost:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Bodies</th>
+<th>Orientation cost</th>
+<th>Role</th>
+</tr></thead><tbody>
+<tr><td>pelvis, chest, head, hands, feet</td><td>0.5</td><td>pin the pose. A hand's roll and a foot's yaw carry meaning</td></tr>
+<tr><td>upper and lower arm, upper and lower leg</td><td>0.1</td><td>pole target. Steer the elbow and the knee without fighting the end effector</td></tr>
+</tbody></table></div>
+<p>The low cost is the point of the design. Weights enter the objective squared. A segment's orientation task at cost 0.1 therefore contributes one twenty-fifth of a 0.5 task, and one hundredth of a position task. It picks one branch out of the redundant set without pulling the hand off its target.</p>
+<h3 id="the-posture-regularizer">The posture regularizer<a class="anchor" href="#the-posture-regularizer" aria-label="Link to this section">#</a></h3>
+<p>A straight limb is a kinematic singularity. Where the knee angle reaches zero, two of the leg's rotation axes line up. The Jacobian loses rank there, so the QP has no well-conditioned direction to bend the knee in.</p>
+<p><code>MotionRetargetingIK</code> adds a <code>PostureTask</code> at cost 0.1, whose target holds every joint at its model default except the knees and the elbows:</p>
+<div class="mathblock">
+$$
+\theta^{\text{ref}}_j \;=\;
+\begin{cases}
++0.2\ \text{rad} &amp; \text{if the joint name contains } \texttt{knee} \\
+-0.2\ \text{rad} &amp; \text{if the joint name contains } \texttt{elbow} \\
+\theta^{\text{default}}_j &amp; \text{otherwise}
+\end{cases}
+\tag{5}
+$$
+</div>
+<p>The same posture is also the initial configuration, so frame 0 starts off the singularity as well as ending off it. At cost 0.1 the task loses to every frame task, so it changes the result only inside the null space that the frame tasks leave free.</p>
+<h3 id="the-per-frame-loop">The per-frame loop<a class="anchor" href="#the-per-frame-loop" aria-label="Link to this section">#</a></h3>
+<pre class="mermaid">flowchart TB
+  S["frame t: set every task target&lt;br/&gt;position p_s(t), orientation q_s(t) ⊗ q_off"]
+  E0["measure the total task error"]
+  Q["solve the QP of equation (4)&lt;br/&gt;then integrate q ← q ⊕ Δq"]
+  C{"error decrease&lt;br/&gt;&amp;gt; 1e-4 ?"}
+  IT{"iterations&lt;br/&gt;&amp;lt; 40 ?"}
+  W["mj_forward, then record&lt;br/&gt;qpos[7:] and every tracked link pose"]
+
+  S --&gt; E0 --&gt; Q --&gt; C
+  C --&gt;|"yes"| IT
+  IT --&gt;|"yes"| Q
+  IT --&gt;|"no"| W
+  C --&gt;|"no"| W
+  W --&gt;|"next frame"| S</pre>
+<p>The loop stops when one iteration improves the combined error by less than $10^{-4}$, or after 40 iterations. It prints a warning when it hits the iteration cap.</p>
+<p>Warm starting is what makes the solve cheap. Frame $t+1$ begins from the configuration that frame $t$ ended at, and consecutive frames of a 50 Hz motion are close, so most frames converge in a few iterations.</p>
+<h3 id="what-the-solve-writes">What the solve writes<a class="anchor" href="#what-the-solve-writes" aria-label="Link to this section">#</a></h3>
+<p>The solve records the joint angles from <code>qpos[7:]</code>, and the target it aimed each tracked link at — the source pose carried onto that link's frame convention — as the goal. It differences the joint angles for the joint velocities, and calls <code>fill_body_velocities</code> on the goal, because <code>mink</code> integrates <code>qpos</code> and leaves <code>qvel</code> at zero.</p>
+<p><code>write_robot_motion</code> stores that as <code>&lt;robot&gt;/&lt;name&gt;.rrd</code>: the joints, the goal, and the root link's reached pose as the placement that puts the robot in the world. The poses the other links reached are not stored, because they are the forward kinematics of the joints beside them. The reference layer stays untouched.</p>
+<h2 id="theory-robot-animation">Theory: robot → animation<a class="anchor" href="#theory-robot-animation" aria-label="Link to this section">#</a></h2>
+<p>This direction has no optimization. A log already carries the joint angles that the robot reached, so forward kinematics is enough to produce every link pose. The work is in the bookkeeping: three coordinate conventions, three rest poses, and one rig whose bone axes match nothing.</p>
+<p>The direction runs in three stages. Stage 1 turns a log into a motion. Stage 2 plays that motion on the robot's own rig. Stage 3 transfers the robot's rig onto a character rig.</p>
+<h3 id="stage-1-forward-kinematics">Stage 1: forward kinematics<a class="anchor" href="#stage-1-forward-kinematics" aria-label="Link to this section">#</a></h3>
+<p><code>read_robot_log</code> decodes two ROS 2 topics from the <code>.mcap</code> file and aligns them by log timestamp:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Topic</th>
+<th>Message</th>
+<th>Carries</th>
+</tr></thead><tbody>
+<tr><td><code>/odom</code></td><td><code>nav_msgs/msg/Odometry</code></td><td>the floating-base pose and twist, in <code>world</code></td></tr>
+<tr><td><code>/joint_states</code></td><td><code>sensor_msgs/msg/JointState</code></td><td>the joint angles and joint velocities</td></tr>
+</tbody></table></div>
+<p>Timestamps that appear on one topic only are dropped, and the reader reports how many. The frame rate comes from the <strong>median</strong> sample period, so the gaps that dropped messages leave do not pull it down. A mean would fold them in.</p>
+<p><code>robot_log_to_motion</code> then reindexes the logged joint angles into MJCF joint order, and runs <code>mj_kinematics</code> once per frame. The <code>lite_pro</code> MJCF has no floating base: <code>pelvis</code> is a fixed root at the world origin. Forward kinematics on the logged angles therefore gives each body's pose relative to the model's root frame, not in the world. The logged base pose is composed on top:</p>
+<div class="mathblock">
+$$
+W_b(t) \;=\; T_{\text{base}}(t)\; F_{\text{pelvis}}\big(\theta(t)\big)^{-1}\; F_b\big(\theta(t)\big)
+\tag{6}
+$$
+</div>
+<figure>
+<svg viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="The MJCF root sits at the origin, so forward kinematics gives poses in the root frame. The logged base transform moves the whole chain into the world.">
+  <defs>
+    <marker id="n1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="currentColor"/></marker>
+    <marker id="n2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--fig-blue)"/></marker>
+    <g id="fr3">
+      <line x1="0" y1="0" x2="34" y2="0" stroke="var(--fig-red)" stroke-width="2"/>
+      <line x1="0" y1="0" x2="0" y2="-34" stroke="var(--fig-green)" stroke-width="2"/>
+      <circle cx="0" cy="0" r="3" fill="currentColor"/>
+    </g>
+  </defs>
+  <g font-family="system-ui, sans-serif" font-size="12.5" fill="currentColor">
+
+    <!-- left: the model root frame -->
+    <text x="150" y="30" text-anchor="middle" font-weight="600">the MJCF, fixed base</text>
+    <line x1="40" y1="250" x2="270" y2="250" stroke="currentColor" stroke-width="1"
+          opacity="0.35"/>
+    <use href="#fr3" transform="translate(70,250)"/>
+    <text x="46" y="272" font-size="11.5" opacity="0.8">model root = origin</text>
+    <line x1="70" y1="250" x2="120" y2="180" stroke="currentColor" stroke-width="3"
+          opacity="0.45"/>
+    <line x1="120" y1="180" x2="190" y2="150" stroke="currentColor" stroke-width="3"
+          opacity="0.45"/>
+    <use href="#fr3" transform="translate(120,180)"/>
+    <use href="#fr3" transform="translate(190,150) rotate(-25)"/>
+    <text x="228" y="128">F_b(&#952;)</text>
+    <text x="112" y="206">F_pelvis(&#952;)</text>
+
+    <!-- the base transform -->
+    <g>
+      <line x1="295" y1="150" x2="365" y2="150" stroke="var(--fig-blue)" stroke-width="1.8"
+            marker-end="url(#n2)"/>
+      <text x="330" y="140" text-anchor="middle" fill="var(--fig-blue)">T_base(t)</text>
+      <text x="330" y="172" text-anchor="middle" font-size="11" opacity="0.75">from /odom</text>
+    </g>
+
+    <!-- right: the world -->
+    <text x="500" y="30" text-anchor="middle" font-weight="600">the logged world</text>
+    <line x1="390" y1="250" x2="650" y2="250" stroke="currentColor" stroke-width="1"
+          opacity="0.35"/>
+    <use href="#fr3" transform="translate(410,250)"/>
+    <text x="392" y="272" font-size="11.5" opacity="0.8">world origin</text>
+    <line x1="490" y1="185" x2="540" y2="115" stroke="currentColor" stroke-width="3"
+          opacity="0.45"/>
+    <line x1="540" y1="115" x2="610" y2="85" stroke="currentColor" stroke-width="3"
+          opacity="0.45"/>
+    <use href="#fr3" transform="translate(540,115)"/>
+    <use href="#fr3" transform="translate(610,85) rotate(-25)"/>
+    <text x="624" y="106">W_b(t)</text>
+    <path d="M415,244 L486,190" fill="none" stroke="var(--fig-blue)" stroke-width="1.4"
+          stroke-dasharray="5 4" marker-end="url(#n2)"/>
+  </g>
+</svg>
+<figcaption><b>Figure 4.</b> Equation (6) in two steps. Forward kinematics places the chain in
+the model's root frame. The logged base transform then carries the whole chain into the world.
+</figcaption>
+</figure>
+<p>$F_{\text{pelvis}}$ is the identity when the MJCF puts its root body at the origin, so equation (6) reduces to $W_b(t) = T_{\text{base}}(t)\, F_b(\theta(t))$. The general form stays correct if a future MJCF places the root away from the origin, which is why the code keeps it.</p>
+<p>The MJCF body frames match the URDF link frames, so the resulting motion can drive an armature built from the same URDF. Stage 2 relies on that.</p>
+<p><code>mikumotion import</code> writes both layers from this one sequence. The poses are the export, and the logged joint angles are the solve, so no IK runs.</p>
+<h3 id="stage-2-play-a-motion-on-the-robots-rig">Stage 2: play a motion on the robot's rig<a class="anchor" href="#stage-2-play-a-motion-on-the-robots-rig" aria-label="Link to this section">#</a></h3>
+<p><code>robot_model_to_armature</code> builds the rig from the parsed URDF. Each link becomes one bone, with its head at the link origin. Each link's visual mesh is imported, placed at the link frame times the visual's own <code>&lt;origin&gt;</code>, and parented to the matching bone with the transform kept.</p>
+<p>The rest placement of a link is the product of the joint origins along its chain:</p>
+<div class="mathblock">
+$$
+\mathrm{Rest}_i \;=\; \prod_{j \in \text{chain}(i)} L_j, \qquad
+L_j = \begin{bmatrix} R(\text{rpy}_j) &amp; \text{xyz}_j \\ 0 &amp; 1 \end{bmatrix}
+\tag{7}
+$$
+</div>
+<p>URDF <code>rpy</code> is a <strong>fixed-axis</strong> rotation: roll about X, then pitch about Y, then yaw about Z, each about the fixed parent axes. The matrix is therefore $R = R_z(\text{yaw})\,R_y(\text{pitch})\,R_x(\text{roll})$, and the quaternion is the Hamilton product $q_z \otimes q_y \otimes q_x$.</p>
+<div class="callout warning"><p><span class="callout-label">Warning</span> A bone's own orientation points head to tail, and does not match its link frame. <code>build_armature</code> gives every bone the same 0.05 m length, because a URDF says nothing about where a bone should point. Never read a link frame off a bone's orientation. Read it from equation (7).</p></div>
+<figure>
+<svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="A bone points head to tail while its link frame points elsewhere. The animated pose is the rest placement times a world-space delta.">
+  <defs>
+    <marker id="p1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="currentColor"/></marker>
+    <marker id="p2" markerWidth="9" markerHeight="9" refX="9" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="var(--fig-blue)"/></marker>
+    <g id="fr4">
+      <line x1="0" y1="0" x2="40" y2="0" stroke="var(--fig-red)" stroke-width="2.1"/>
+      <line x1="0" y1="0" x2="0" y2="-40" stroke="var(--fig-green)" stroke-width="2.1"/>
+      <circle cx="0" cy="0" r="3.2" fill="currentColor"/>
+    </g>
+  </defs>
+  <g font-family="system-ui, sans-serif" font-size="12.5" fill="currentColor">
+
+    <text x="160" y="28" text-anchor="middle" font-weight="600">rest</text>
+    <text x="520" y="28" text-anchor="middle" font-weight="600">frame t</text>
+
+    <!-- rest -->
+    <g transform="translate(120,170)">
+      <path d="M0,0 L58,-34 L52,-18 z" fill="var(--fig-gray)" opacity="0.55"/>
+      <text x="66" y="-38" font-size="11.5" opacity="0.85">bone, head to tail</text>
+      <use href="#fr4"/>
+      <text x="-52" y="6" font-size="12">Rest_i</text>
+      <text x="-14" y="26" font-size="11" opacity="0.75">link frame</text>
+    </g>
+
+    <!-- delta arrow -->
+    <g transform="translate(290,0)">
+      <line x1="10" y1="140" x2="90" y2="140" stroke="var(--fig-blue)" stroke-width="1.8"
+            marker-end="url(#p2)"/>
+      <text x="50" y="130" text-anchor="middle" font-size="12" fill="var(--fig-blue)">Δ_i(t)</text>
+      <text x="50" y="162" text-anchor="middle" font-size="11" opacity="0.75">world space</text>
+    </g>
+
+    <!-- animated -->
+    <g transform="translate(500,170) rotate(-35)">
+      <path d="M0,0 L58,-34 L52,-18 z" fill="var(--fig-gray)" opacity="0.55"/>
+      <use href="#fr4"/>
+    </g>
+    <text x="562" y="96" text-anchor="middle" font-size="12">M_i(t) = &#916;_i(t) &#183; Rest_i</text>
+    <text x="470" y="212" font-size="11" opacity="0.75">the mesh rides the bone</text>
+  </g>
+</svg>
+<figcaption><b>Figure 5.</b> The animated link pose is its rest placement premultiplied by a
+world-space delta. The bone's own axis is irrelevant to that product, so it can point anywhere.
+</figcaption>
+</figure>
+<p><code>motion_to_armature</code> computes the world-space delta of each driven link:</p>
+<div class="mathblock">
+$$
+\Delta_i(t) \;=\; M_i(t)\, \mathrm{Rest}_i^{-1}
+\tag{8}
+$$
+</div>
+<p>$M_i(t)$ is the link's world pose from the motion. Blender does not accept a world pose on a pose bone, so the delta has to become a <code>matrix_basis</code>. Blender composes a bone's pose as</p>
+<div class="mathblock">
+$$
+\mathrm{Pose}_i \;=\; \mathrm{Pose}_{\text{parent}}\;
+\big(\mathrm{Bone}^{\text{rest}}_{\text{parent}}\big)^{-1}\, \mathrm{Bone}^{\text{rest}}_i \;
+\mathrm{Basis}_i
+\tag{9}
+$$
+</div>
+<p>Require every driven bone to reach $\mathrm{Pose}_i = \Delta_i\, \mathrm{Bone}^{\text{rest}}_i$, substitute the same requirement for the parent, and equation (9) solves for the basis:</p>
+<div class="mathblock">
+$$
+\mathrm{Basis}_i \;=\; \big(\mathrm{Bone}^{\text{rest}}_i\big)^{-1}\;
+\Delta_{\text{parent}}^{-1}\; \Delta_i\; \mathrm{Bone}^{\text{rest}}_i
+\tag{10}
+$$
+</div>
+<p>Equation (10) is exact. It merges no ball joints and approximates nothing, and each bone's basis depends on the motion and the rest pose alone. No bone needs the depsgraph to be re-evaluated before the next bone is posed, which is what keeps a long sequence fast. A mesh parented with the transform kept then lands exactly at $M_i(t)$.</p>
+<p><code>motion_to_armature</code> keyframes <code>location</code> and <code>rotation_quaternion</code> on each driven bone, and sets the scene frame rate and frame range from the motion.</p>
+<h3 id="stage-3-robot-rig-to-character-rig">Stage 3: robot rig to character rig<a class="anchor" href="#stage-3-robot-rig-to-character-rig" aria-label="Link to this section">#</a></h3>
+<p>A robot rig and a character rig share a topology and a rest pose, but not their proportions and not their local bone axes. <code>retarget_armature</code> therefore transfers rotation only, plus one translation on the root.</p>
+<p>For each mapped pair (source bone $s$, target bone $b$), all rotations in world frame:</p>
+<div class="mathblock">
+$$
+R_b^{\text{desired}}(t) \;=\;
+\underbrace{R_s^{\text{pose}}(t)\, \big(R_s^{\text{rest}}\big)^{-1}}_{\Delta R_s(t)}\;
+R_b^{\text{rest}}
+\tag{11}
+$$
+</div>
+<p>This is the same rule as equation (1), in the other direction. Cancelling the source's own rest orientation is what makes it work between rigs that share a rest pose but not their bone axes. A URDF robot's link frames against a VRM's head-to-tail bones are such a pair.</p>
+<div class="callout caution"><p><span class="callout-label">Caution</span> Do not map through the rest orientations instead, as $R_b^{\text{rest}} \big(R_s^{\text{rest}}\big)^{-1} R_s^{\text{pose}}$. That form conjugates the delta rather than composing it on the left, and it mangles such a pair in silence. The character still moves, so the error reads as a bad bone map rather than as bad math.</p></div>
+<p>Three details make the transfer hold up:</p>
+<ol><li><strong>Depth order.</strong> <code>retarget_frame</code> poses the mapped bones in order of their depth in the target armature. A bone reads its parent's <em>current</em> world matrix, so the parent must already carry its own pose. Blender needs a <code>view_layer.update()</code> between bones for that reason, unlike stage 2.</li></ol>
+<ol><li><strong>A clean slate per frame.</strong> <code>retarget_frame</code> resets each mapped bone to zero location, identity rotation and unit scale before it poses the bone. A stale channel therefore cannot leak into the frame.</li></ol>
+<ol><li><strong>Renormalization.</strong> A chain of matrix products drifts away from orthonormal, and Blender reads the drift as scale or shear on the bone. <code>rot3_orthonormalized</code> renormalizes at every step.</li></ol>
+<p>The root also takes a world <em>position</em>, which follows the source root with a constant offset:</p>
+<div class="mathblock">
+$$
+p_b^{\text{root}}(t) \;=\; p_s^{\text{root}}(t) \;+\; c, \qquad
+c \;=\; p_b^{\text{root,rest}} - p_s^{\text{root}}(t_0)
+\tag{12}
+$$
+</div>
+<p>The offset $c$ is measured once, at the first baked frame, so the two rigs line up there. Deriving the position from the target's rest pose each frame instead would turn the target's rest hip offset by the root's rotation. The character then sinks through the floor as soon as the root turns far, when it lies prone for example.</p>
+<h3 id="chains-against-ball-joints">Chains against ball joints<a class="anchor" href="#chains-against-ball-joints" aria-label="Link to this section">#</a></h3>
+<p>The robot models each 3-DOF articulation as a <strong>chain</strong> of 1-DOF links. A VRM humanoid models the same articulation as one ball bone. The accumulated world orientation of the whole chain sits on its <strong>last</strong> link, so that link is what the bone map names.</p>
+<figure>
+<svg viewBox="0 0 680 180" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Three single-axis robot links accumulate one orientation, which drives one ball bone on the character rig.">
+  <defs>
+    <marker id="c1" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,6 L8,3 z" fill="currentColor"/></marker>
+    <marker id="c2" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"
+            markerUnits="strokeWidth"><path d="M0,0 L0,7 L9,3.5 z" fill="var(--fig-blue)"/></marker>
+  </defs>
+  <g font-family="system-ui, sans-serif" font-size="12.5" fill="currentColor">
+    <text x="195" y="26" text-anchor="middle" font-weight="600">robot: a chain of 1-DOF links</text>
+    <text x="555" y="26" text-anchor="middle" font-weight="600">VRM: one ball bone</text>
+
+    <rect x="40" y="76" width="86" height="42" rx="6" fill="none" stroke="currentColor"
+          stroke-width="1.3"/>
+    <text x="83" y="95" text-anchor="middle" font-size="11.5">shoulder</text>
+    <text x="83" y="110" text-anchor="middle" font-size="11.5">_pitch</text>
+    <line x1="126" y1="97" x2="150" y2="97" stroke="currentColor" stroke-width="1.4"
+          marker-end="url(#c1)"/>
+    <rect x="152" y="76" width="86" height="42" rx="6" fill="none" stroke="currentColor"
+          stroke-width="1.3"/>
+    <text x="195" y="95" text-anchor="middle" font-size="11.5">shoulder</text>
+    <text x="195" y="110" text-anchor="middle" font-size="11.5">_roll</text>
+    <line x1="238" y1="97" x2="262" y2="97" stroke="currentColor" stroke-width="1.4"
+          marker-end="url(#c1)"/>
+    <rect x="264" y="76" width="86" height="42" rx="6" fill="var(--fig-blue-bg)" stroke="var(--fig-blue)"
+          stroke-width="1.8"/>
+    <text x="307" y="95" text-anchor="middle" font-size="11.5" fill="var(--fig-blue-ink)">shoulder</text>
+    <text x="307" y="110" text-anchor="middle" font-size="11.5" fill="var(--fig-blue-ink)">_yaw</text>
+    <text x="307" y="142" text-anchor="middle" font-size="11" opacity="0.8">carries the whole 3-DOF orientation</text>
+
+    <line x1="368" y1="97" x2="452" y2="97" stroke="var(--fig-blue)" stroke-width="2"
+          marker-end="url(#c2)"/>
+    <text x="410" y="86" text-anchor="middle" fill="var(--fig-blue)">eq. (11)</text>
+
+    <rect x="470" y="72" width="170" height="50" rx="25" fill="none" stroke="currentColor"
+          stroke-width="1.3"/>
+    <text x="555" y="102" text-anchor="middle">J_Bip_L_UpperArm</text>
+    <text x="555" y="142" text-anchor="middle" font-size="11" opacity="0.8">J_Bip_L_Shoulder stays unmapped</text>
+  </g>
+</svg>
+<figcaption><b>Figure 6.</b> Three robot links carry one shoulder. The VRM
+<code>UpperArm</code> bone therefore reads the last link of the chain, and the VRM
+<code>Shoulder</code> bone is left unmapped.</figcaption>
+</figure>
+<p><code>LITE_PRO_TO_VROID_BONE_MAP</code> follows that rule throughout:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>VRM bone</th>
+<th><code>lite_pro</code> link</th>
+<th>Why</th>
+</tr></thead><tbody>
+<tr><td><code>J_Bip_C_Spine</code>, <code>_Chest</code>, <code>_UpperChest</code></td><td><code>waist_yaw</code>, <code>waist_roll</code>, <code>chest</code></td><td>the torso chain, in order</td></tr>
+<tr><td><code>J_Bip_*_UpperArm</code></td><td><code>*_shoulder_yaw</code></td><td>the last of three shoulder links</td></tr>
+<tr><td><code>J_Bip_*_Shoulder</code></td><td>—</td><td>unmapped. <code>UpperArm</code> already carries the whole shoulder</td></tr>
+<tr><td><code>J_Bip_*_UpperLeg</code></td><td><code>*_hip_yaw</code></td><td>the last of three hip links</td></tr>
+<tr><td><code>J_Bip_*_Foot</code></td><td><code>*_foot</code></td><td>the last of the ankle links</td></tr>
+<tr><td><code>J_Bip_*_&lt;finger&gt;1..3</code></td><td><code>*_finger&lt;n&gt;_j1..j3</code></td><td>the robot's fourth finger joint has no VRM phalanx</td></tr>
+</tbody></table></div>
+<p>A robot finger has four joints and a VRM finger has three phalanges, so <code>j4</code> is dropped. The finger index follows the robot's own numbering, where <code>finger1</code> is the thumb, nearest the wrist, and <code>finger5</code> is the little finger.</p>
+<h2 id="repository-layout">Repository layout<a class="anchor" href="#repository-layout" aria-label="Link to this section">#</a></h2>
+<pre><code>mikumotion/            the library
+scripts/blender/       the scripts that Blender runs
+tests/                 unit tests for the math, the store and the retargeting
+blender-projects/      Blender project files (not in the repository)
+data/motions/          converted motions
+data/robots/           robot assets for the FK and the IK (not in the repository)
+renders/               rendered video and stills (not in the repository)
+docs/                  this page</code></pre>
+<p>Run the tests with <code>pytest</code>. They cover the quaternion helpers, the store round trip and the retargeting math, and they need neither Blender nor a robot asset.</p>
+<h2 id="references">References<a class="anchor" href="#references" aria-label="Link to this section">#</a></h2>
+<ul><li><a href="https://rerun.io/docs/concepts/apps-and-recordings">Rerun: applications and recordings</a> — how the viewer pools several files into one recording.</li><li><a href="https://github.com/kevinzakka/mink">mink</a> — the differential IK library behind <code>MotionRetargetingIK</code>.</li><li><a href="https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18">SMPL-X joint names</a> — the body naming convention.</li><li><a href="https://github.com/isaac-sim/IsaacLab/blob/main/source/isaaclab_tasks/isaaclab_tasks/direct/humanoid_amp/motions/motion_loader.py">Isaac Lab <code>motion_loader.py</code></a> — the origin of the <code>MotionSequence</code> field layout.</li><li><a href="https://github.com/NVlabs/CALM/blob/main/calm/poselib/poselib/skeleton/skeleton3d.py">NVIDIA CALM poselib</a> — the origin of <code>ArmatureTree</code>.</li><li><a href="https://extensions.blender.org/add-ons/mmd-tools/">MMD Tools</a> — the Blender add-on for MMD models and motions.</li></ul>
+
+    <footer class="pagefoot">
+      <p><a href="https://github.com/T-K-233/MikuMotionTools/edit/main/docs/index.html">Edit this page on GitHub</a></p>
+      <p>MIT licensed. The Blender project files and the MMD motions are not covered by
+      that license.</p>
+    </footer>
+    <a class="totop" href="#top">Back to top</a>
+  </main>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({
+    startOnLoad: true,
+    // the diagram labels carry <b>, <i> and <br/>, which the strict level strips
+    securityLevel: "loose",
+    theme: dark ? "dark" : "default",
+    fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+    flowchart: { htmlLabels: true, curve: "basis", padding: 12 }
+  });
+</script>
+
+<script>
+  // The diagram blocks start hidden, so their source never flashes before mermaid
+  // draws them. If mermaid does not load, show the source rather than nothing.
+  setTimeout(function () {
+    document.querySelectorAll("pre.mermaid:not([data-processed])").forEach(function (node) {
+      node.style.visibility = "visible";
+    });
+  }, 4000);
+</script>
+
+<script>
+  // Highlight the table of contents entry of the section now on screen.
+  (function () {
+    const links = Array.from(document.querySelectorAll(".toc-list a"));
+    if (!links.length) return;
+    const wanted = new Set(links.map(a => a.hash.slice(1)));
+    const targets = Array.from(document.querySelectorAll("h2[id], h3[id]"))
+      .filter(h => wanted.has(h.id));
+    if (!targets.length) return;
+
+    let active = [];
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(e => e.isIntersecting);
+      if (!visible.length) return;
+      const id = visible[0].target.id;
+      active.forEach(a => a.classList.remove("active"));
+      active = links.filter(a => a.hash === "#" + id);
+      active.forEach(a => a.classList.add("active"));
+    }, { rootMargin: "-70px 0px -75% 0px" });
+
+    targets.forEach(t => observer.observe(t));
+  })();
+
+  // Copy button on every code block. navigator.clipboard needs a secure context,
+  // so this does nothing when the file is opened over file://.
+  document.querySelectorAll("pre:not(.mermaid) > code").forEach(code => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy";
+    button.textContent = "Copy";
+    button.addEventListener("click", () => {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        button.textContent = "Copied";
+        setTimeout(() => { button.textContent = "Copy"; }, 1500);
+      });
+    });
+    code.parentElement.appendChild(button);
+  });
+</script>
+
+</body>
+</html>
