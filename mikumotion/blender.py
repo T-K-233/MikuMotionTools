@@ -13,6 +13,7 @@ import numpy as np
 import bpy
 
 from bpy.types import Object, PoseBone
+from bpy_extras import anim_utils
 from mathutils import Matrix, Quaternion, Vector
 
 from .armature_tree import ArmatureTree
@@ -671,13 +672,20 @@ def clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_
     if not ad or not ad.action:
         return
 
-    action = ad.action
+    # Blender 4.4 keeps an action's F-curves per slot, and 5.0 drops the action-wide list
+    if hasattr(ad, "action_slot"):
+        channelbag = anim_utils.action_get_channelbag_for_slot(ad.action, ad.action_slot)
+        if channelbag is None:
+            return
+        fcurves = channelbag.fcurves
+    else:
+        fcurves = ad.action.fcurves
     mapped = set(bone_map.keys())
     mapped.add(translation_root_target)
 
     to_remove = []
 
-    for fc in action.fcurves:
+    for fc in fcurves:
         dp = fc.data_path
         for b in mapped:
             prefix = f'pose.bones["{b}"].'
@@ -690,7 +698,7 @@ def clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_
                 break
 
     for fc in to_remove:
-        action.fcurves.remove(fc)
+        fcurves.remove(fc)
 
     if to_remove:
         print(f"[INFO] Removed {len(to_remove)} existing F-curves for mapped/translation-root bones.")
