@@ -714,6 +714,7 @@ blender-projects/                      the Blender project files</code></pre>
   IK --&gt;|"mikumotion retarget"| ROB</pre>
 <p><strong>1. Prepare the Blender project.</strong> Import the source motion, and set the scene frame rate to the policy update rate:</p>
 <pre><code class="language-python">bpy.context.scene.render.fps = 50</code></pre>
+<div class="callout warning"><p><span class="callout-label">Warning</span> Setting the rate does not move the keys. An MMD import keys the motion at 30 fps, one key per MMD frame, and the keys stay on those frames, so the scene now plays the motion 5/3 too fast. The bake in step 4 resamples a character from its own rate, <code>fps</code> in <code>CHARACTER_RIGS</code>, onto the scene's 50 fps. A rig that skips the bake must already be keyed at 50 fps.</p></div>
 <p><strong>2. Add the helper bones.</strong> Add one bone per body part that you want to export, named <code>&lt;smpl_name&gt;.frame</code>, such as <code>pelvis.frame</code> and <code>left_hand.frame</code>. Parent each helper bone to the rig bone that carries that body part.</p>
 <p>The helper bone gives the export a stable name and a stable axis convention on a rig whose own bones have neither. <code>armature_to_motion</code> reads the bone that matches <code>&lt;body_name&gt; + &quot;.frame&quot;</code>.</p>
 <p><strong>3. Add an export preset.</strong> Add an entry to <code>MOCAP_RIGS</code> in <code>mikumotion/presets.py</code>:</p>
@@ -742,10 +743,12 @@ blender-projects/                      the Blender project files</code></pre>
 <tr><td><code>armature</code></td><td><code>str</code></td><td>Name of the character's armature object in the <code>.blend</code> file</td></tr>
 <tr><td><code>bone_map</code></td><td><code>dict[str, str]</code></td><td><code>{mocap bone: character bone}</code>, such as <code>{&quot;pelvis&quot;: &quot;下半身&quot;}</code></td></tr>
 <tr><td><code>translation_root</code></td><td><code>str</code></td><td>The character bone whose motion places the whole rig in the world</td></tr>
+<tr><td><code>fps</code></td><td><code>int</code></td><td>The rate the character's animation is keyed at: 30 for MMD</td></tr>
 </tbody></table></div>
 <p>Nothing in the script is specific to one format. A new source, such as Mixamo or ActorCore, is an entry in that table and a bone map beside <code>MMD_TO_ZAMUZA_BONE_MAP</code>. It is never another script.</p>
 <pre><code class="language-bash">blender ./blender-projects/zamuza.blend --background --python ./scripts/blender/convert_character_to_mocap.py -- zamuza</code></pre>
 <p>The transfer is the same <code>blender.retarget_armature</code> that bakes a robot rig onto a VRM character: both jobs put one rig's motion onto a differently proportioned rig. The script saves the <code>.blend</code> file, so the MMD armature is not needed again.</p>
+<p>The bake also converts the frame rate. Scene frame <code>f</code> reads the character at its frame <code>f × fps / 50</code>, between two of its keys when that is not whole, so the rig carries one key per 50 fps frame. The scene's frame range counts the character's own frames, as the import set it. The script records the rate on the rig, and the export refuses a rig that was baked at another rate, or before the bake converted it.</p>
 <p><strong>5. Export the motion.</strong></p>
 <pre><code class="language-bash">blender ./blender-projects/zamuza.blend --python ./scripts/blender/convert_mocap_to_motion.py -- zamuza</code></pre>
 <p>The script writes two files. <code>reference/zamuza_reset.rrd</code> holds the rig at rest, over two frames. <code>reference/zamuza.rrd</code> holds the animation. The IK solve needs both.</p>
@@ -1148,7 +1151,7 @@ $$
 <p>The scale factor $2\,\mathrm{atan2}(s, w) / s$ tends to 2 as the step vanishes, so the implementation uses 2 where $s &lt; 10^{-12}$. Frame 0 keeps its zeros, because there is no earlier pose to difference against.</p>
 <p>The IK solve differences its own joint angles the same way, because <code>mink</code> integrates <code>qpos</code> and leaves <code>qvel</code> at zero. <code>mj_objectVelocity</code> would report every body as motionless.</p>
 <h3 id="frame-rate">Frame rate<a class="anchor" href="#frame-rate" aria-label="Link to this section">#</a></h3>
-<p>Match the frame rate of the motion to the policy update rate of the training environment, usually 50 Hz. A mismatch forces the training run to interpolate every frame, which costs time and blurs fast contact events. <code>convert_mocap_to_motion.py</code> asserts that the Blender scene is 50 fps. <code>mcap_io.py</code> infers the rate from the median sample period of the log, which ignores the gaps that dropped messages leave.</p>
+<p>Match the frame rate of the motion to the policy update rate of the training environment, usually 50 Hz. A mismatch forces the training run to interpolate every frame, which costs time and blurs fast contact events. <code>convert_mocap_to_motion.py</code> asserts that the Blender scene is 50 fps, and that a baked rig was baked at that rate. <code>convert_character_to_mocap.py</code> resamples a character keyed at another rate, such as an MMD motion at 30 fps. <code>mcap_io.py</code> infers the rate from the median sample period of the log, which ignores the gaps that dropped messages leave.</p>
 <h3 id="body-naming">Body naming<a class="anchor" href="#body-naming" aria-label="Link to this section">#</a></h3>
 <p>Name generic bodies after the <a href="https://github.com/vchoutas/smplx/blob/main/smplx/joint_names.py#L244C21-L268C18">SMPL-X joint names</a>. One name then means one body part across every rig and every retargeting map. Robot layers keep the robot's own link names instead, because those must match the URDF.</p>
 <h2 id="theory-animation-robot">Theory: animation → robot<a class="anchor" href="#theory-animation-robot" aria-label="Link to this section">#</a></h2>

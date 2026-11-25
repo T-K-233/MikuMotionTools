@@ -59,12 +59,15 @@ MMD_TO_ZAMUZA_BONE_MAP = {
 #: Which character armature each preset bakes from, keyed the same as MOCAP_RIGS. A preset
 #: appears here only if its rig needs the bake. ``translation_root`` is the character bone whose
 #: motion places the whole rig in the world, which differs per format: MMD centres a rig on
-#: センター, Mixamo on mixamorig:Hips.
+#: センター, Mixamo on mixamorig:Hips. ``fps`` is the rate the character's animation is keyed
+#: at, which the bake resamples to the scene's 50 fps: an MMD motion is keyed at 30 fps, and an
+#: import leaves its keys on those frames even when the scene is set to 50 fps.
 CHARACTER_RIGS = {
     "zamuza": {
         "armature": "YYB式初音ミクv1.02_arm",
         "bone_map": MMD_TO_ZAMUZA_BONE_MAP,
         "translation_root": "センター",
+        "fps": 30,
     },
 }
 
@@ -85,7 +88,8 @@ MOCAP_RIGS = {
         "armature": "Armature",
         "scale": 1.0,
         "rotate_z": 0.0,
-        "frames": (0, 2000),
+        # 66.7 s at 50 fps: the first 2000 frames of the 30 fps MMD motion
+        "frames": (0, 3333),
         # this rig has a single spine bone, so it fills the spine1 slot only; listing it
         # twice would export the same pose under one name twice, which the store rejects
         "bones": [

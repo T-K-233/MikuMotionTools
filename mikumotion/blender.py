@@ -6,6 +6,7 @@ This module imports ``bpy``, so it only loads inside Blender. The entry points B
 live in ``scripts/blender/``, one per conversion, named ``convert_<source>_to_<target>.py``.
 """
 
+import math
 import os
 import sys
 
@@ -13,6 +14,7 @@ import numpy as np
 import bpy
 
 from bpy.types import Object, PoseBone
+from bpy_extras import anim_utils
 from mathutils import Matrix, Quaternion, Vector
 
 from .armature_tree import ArmatureTree
@@ -34,6 +36,16 @@ def script_args():
     """
     argv = sys.argv
     return argv[argv.index("--") + 1:] if "--" in argv else []
+
+
+#: Custom property on a baked mocap rig: the scene rate its keys were written at. The export
+#: reads it to refuse a rig whose keys sit on a different rate than the motion it would write.
+BAKED_FPS = "mikumotion_baked_fps"
+
+
+def scene_fps() -> float:
+    """The frame rate of the current scene, ``fps_base`` included."""
+    return C.scene.render.fps / C.scene.render.fps_base
 
 
 def set_scene_fps(fps: int) -> None:
@@ -81,7 +93,7 @@ def armature_to_motion(
         armature: The source armature object.
         bone_names: The bones to read, in order. They become the motion's body names.
     """
-    fps_float = C.scene.render.fps / C.scene.render.fps_base
+    fps_float = scene_fps()
     start_frame = C.scene.frame_start
     end_frame = C.scene.frame_end
 
@@ -671,13 +683,20 @@ def clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_
     if not ad or not ad.action:
         return
 
-    action = ad.action
+    # Blender 4.4 keeps an action's F-curves per slot, and 5.0 drops the action-wide list
+    if hasattr(ad, "action_slot"):
+        channelbag = anim_utils.action_get_channelbag_for_slot(ad.action, ad.action_slot)
+        if channelbag is None:
+            return
+        fcurves = channelbag.fcurves
+    else:
+        fcurves = ad.action.fcurves
     mapped = set(bone_map.keys())
     mapped.add(translation_root_target)
 
     to_remove = []
 
-    for fc in action.fcurves:
+    for fc in fcurves:
         dp = fc.data_path
         for b in mapped:
             prefix = f'pose.bones["{b}"].'
@@ -690,7 +709,7 @@ def clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_
                 break
 
     for fc in to_remove:
-        action.fcurves.remove(fc)
+        fcurves.remove(fc)
 
     if to_remove:
         print(f"[INFO] Removed {len(to_remove)} existing F-curves for mapped/translation-root bones.")
@@ -722,6 +741,13 @@ def retarget_frame(source_obj: Object, target_obj: Object, bone_map: "dict[str, 
         bpy.context.view_layer.update()
 
 
+def evaluate_frame(frame: float) -> None:
+    """Evaluate the scene at ``frame``, which may fall between two whole frames."""
+    whole = math.floor(frame)
+    C.scene.frame_set(whole, subframe=frame - whole)
+    bpy.context.view_layer.update()
+
+
 def retarget_armature(
     source_obj: Object,
     target_obj: Object,
@@ -730,6 +756,7 @@ def retarget_armature(
     translation_root_source: str,
     frame_start: int,
     frame_end: int,
+    time_scale: float = 1.0,
 ) -> int:
     """
     **robot -> animation, rig to rig.**
@@ -739,6 +766,10 @@ def retarget_armature(
 
     Bakes a source armature's motion onto a target armature, one keyframe per frame over
     ``[frame_start, frame_end]`` inclusive.
+
+    ``time_scale`` is the number of source frames per target frame. Target frame ``f`` reads
+    the source at frame ``f * time_scale``, between two of its keys when that is not whole,
+    so a source keyed at 30 fps bakes onto a 50 fps scene with ``time_scale = 30 / 50``.
 
     Every bone takes the source's world rotation delta (see ``desired_pose_matrix``). The
     root also takes a world *position* that follows the source root, offset so the two line
@@ -760,15 +791,13 @@ def retarget_armature(
 
     clear_existing_keyframes_for_mapped_bones(target_obj, bone_map, translation_root_target)
 
-    C.scene.frame_set(frame_start)
-    bpy.context.view_layer.update()
+    evaluate_frame(frame_start * time_scale)
     source_root = source_obj.pose.bones[translation_root_source]
     root_offset = (get_rest_world_matrix(target_obj, translation_root_target).to_translation()
                    - (source_obj.matrix_world @ source_root.matrix).to_translation())
 
     for frame in range(frame_start, frame_end + 1):
-        C.scene.frame_set(frame)
-        bpy.context.view_layer.update()
+        evaluate_frame(frame * time_scale)
 
         retarget_frame(source_obj, target_obj, bone_map)
 
