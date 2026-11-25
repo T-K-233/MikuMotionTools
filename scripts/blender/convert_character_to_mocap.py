@@ -24,8 +24,14 @@ for example:
 
 The transfer is the same ``blender.retarget_armature`` that bakes a robot rig onto a VRM
 character. Both jobs put one rig's motion onto a differently proportioned rig.
+
+The bake also converts the frame rate. The character's keys sit on its own rate, ``fps`` in
+``CHARACTER_RIGS`` (30 for MMD), and setting the scene to 50 fps does not move them. So the bake
+samples the character at 30/50 of a frame per scene frame, and the mocap rig carries one key per
+50 fps frame. The scene's frame range counts the character's own frames, as its import set it.
 """
 
+import math
 import os
 import sys
 
@@ -34,7 +40,7 @@ import bpy
 if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 
-from mikumotion.blender import retarget_armature, script_args  # noqa: E402
+from mikumotion.blender import BAKED_FPS, retarget_armature, scene_fps, script_args  # noqa: E402
 from mikumotion.presets import CHARACTER_RIGS, MOCAP_RIGS  # noqa: E402
 
 
@@ -47,10 +53,17 @@ def main():
     source = bpy.data.objects[character["armature"]]
     target = bpy.data.objects[MOCAP_RIGS[preset_name]["armature"]]
     scene = bpy.context.scene
+    fps = scene_fps()
+    assert fps == 50, f"scene is {fps} fps, expected 50"
 
+    time_scale = character["fps"] / fps
     frames = retarget_armature(source, target, character["bone_map"], "pelvis",
-                               character["translation_root"], scene.frame_start, scene.frame_end)
-    print(f"baked {frames} frames of {source.name!r} onto {target.name!r}")
+                               character["translation_root"],
+                               math.ceil(scene.frame_start / time_scale),
+                               math.floor(scene.frame_end / time_scale), time_scale)
+    target[BAKED_FPS] = fps
+    print(f"baked {frames} frames of {source.name!r} ({character['fps']} fps) onto "
+          f"{target.name!r} ({fps} fps)")
 
     bpy.ops.wm.save_mainfile()
     print(f"saved {bpy.data.filepath}")

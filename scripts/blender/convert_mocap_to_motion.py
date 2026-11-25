@@ -25,14 +25,16 @@ if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 
 from mikumotion.blender import (  # noqa: E402
+    BAKED_FPS,
     armature_to_motion,
+    scene_fps,
     script_args,
     set_armature_to_pose,
     set_armature_to_rest,
     set_scene_animation_range,
 )
 from mikumotion.motion_sequence import MotionStore, rotate_motion  # noqa: E402
-from mikumotion.presets import MOCAP_RIGS  # noqa: E402
+from mikumotion.presets import CHARACTER_RIGS, MOCAP_RIGS  # noqa: E402
 
 
 def export(armature, rig, name, store):
@@ -54,10 +56,19 @@ def main():
     preset_name = names[0]
     rig = MOCAP_RIGS[preset_name]
 
-    scene_fps = bpy.context.scene.render.fps
-    assert scene_fps == 50, f"scene is {scene_fps} fps, expected 50"
+    fps = scene_fps()
+    assert fps == 50, f"scene is {fps} fps, expected 50"
 
     armature = bpy.data.objects[rig["armature"]]
+    # The export writes one frame per scene frame and labels it with the scene rate, so a rig
+    # whose keys sit on another rate would come out at the wrong speed, with nothing to show it.
+    if preset_name in CHARACTER_RIGS:
+        baked = armature.get(BAKED_FPS)
+        assert baked == fps, (
+            f"{armature.name!r} records no bake at the scene's {fps} fps (it says {baked}). "
+            f"Run convert_character_to_mocap.py, which resamples the "
+            f"{CHARACTER_RIGS[preset_name]['fps']} fps character onto the scene rate."
+        )
     store = MotionStore()
 
     set_scene_animation_range(0, 1)
